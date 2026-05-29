@@ -29,10 +29,10 @@ RoadEdge = Tuple[NodeID, NodeID, Distance]
 # --- SIMULATION ---
 SIMULATION: Dict[str, Any] = {
 	# total number of visitors in the simulation
-	'NumberVisitors': 100,
+	'NumberVisitors': 1000, #PLACEHOLDER
 
 	# event ending time in simulation time units (e.g., seconds)
-	'EventEndingTime': 36000,
+	'EventEndingTime': 36000, #PLACEHOLDER (Simulation is over 3 days with varying timescales, need to look how to fix)
 
 	# time unit description (for documentation only)
 	'TimeUnit': 'seconds',
@@ -42,7 +42,7 @@ SIMULATION: Dict[str, Any] = {
 # --- ROAD_NETWORK ---
 # placeholders; actual network should be loaded from files into these fields
 ROAD_NETWORK: Dict[str, Any] = {
-	'RoadNetwork': [],  # type: List[RoadEdge]
+	'RoadNetwork': [],  # type: List[RoadEdge] PLACEHOLDER FOR LOADED DATA
 	'TrafficDensity': [],  # type: List[Tuple[NodeID, int]]
 	'LoadFunction': None,  # Optional callable to populate the above
 }
@@ -51,70 +51,73 @@ ROAD_NETWORK: Dict[str, Any] = {
 # --- TRAFFIC_MODEL ---
 TRAFFIC_MODEL: Dict[str, Any] = {
 	# free-flow speed (u_max) units consistent with distances/time
-	'u_max': 20.0,
+	'u_max': 20.0, #PLACEHOLDER, Is road dependent so need to change to dict of road id
 
-	# maximum density (rho_max) vehicles per unit length
-	'rho_max': 200.0,
+	# average space one car occupies on the road (bumper-to-bumper, meters)
+	'Car_Spacing': 7.5,
+
+	# maximum density (rho_max) vehicles per unit length; computed per edge in Data.py as (length / CAR_SPACING) * lanes
+	'rho_max': 200.0, #PLACEHOLDER, overridden per edge in Data.py
 
 	# passenger car equivalents for buses (how many cars a bus counts as)
-	'bus_equivalent': 2.5,
+	'bus_equivalent': 2.5, #PLACEHOLDER, Check literature
 
 	# optional speed function: f(density or car_count) -> speed
-	'SpeedFunction': None,
+	'SpeedFunction': None, #PLACEHOLDER, is based on a specific model
 }
 
 
 # --- CAR ---
 CAR: Dict[str, Any] = {
 	# time (seconds) per parked car to find a space
-	'FindSpaceParkCar': 30,
+	'FindSpaceParkCar': 30, #PLACEHOLDER
 
 	# parking-lot entry delay distribution placeholder; call to sample
-	'ParkingLotEntryDelay': lambda: 1.0,
+	'ParkingLotEntryDelay': lambda: 1.0, #PLACEHOLDER
 
 	# maximum wait time (seconds) a car will tolerate (e.g., at entry)
-	'MaxWaitTime': 600,
+	'MaxWaitTime': 600, #PLACEHOLDER
 
 	# runtime-only shared queue for cars; set in init_runtime_objects()
-	'MyCarQueue': None,  # type: Queue | None
+	'MyCarQueue': None,  # type: Queue | None #PLACEHOLDER, idk what to do with this yet
 }
 
 
 # --- CAR_GENERATOR ---
 CAR_GENERATOR: Dict[str, Any] = {
-	# parameters describing the car capacity distribution. Example format:
+	# parameters describing the car capacity distribution. Example format: PLACEHOLDER; replace with real distribution parameters or objects
 	# {'dist': 'poisson', 'lambda': 2} or {'dist': 'custom', 'params': {...}}
-	'CarCapacityDistribution': {'dist': 'fixed', 'value': 4},
+	'CarCapacityDistribution': {'dist': 'fixed', 'value': 4}, #PLACEHOLDER
 }
 
 
 # --- SHUTTLE_BUS ---
 SHUTTLE_BUS: Dict[str, Any] = {
-	'n_buses': 3,
-	'capacity': 20,
-	'MaxWaitTime': 900,  # seconds
-	'BoardingTimePerPassenger': 3,
-	'AlightingTimePerPassenger': 2,
+	'n_buses': 1,
+	'capacity': 60, #PLACEHOLDER, check literature for typical shuttle bus capacities
+	'MaxWaitTime': 300,  # seconds, PLACEHOLDER, check literature for typical shuttle bus wait times
+	'BoardingTimePerPassenger': 3, #PLACEHOLDER, check literature for typical boarding times per passenger
+	'AlightingTimePerPassenger': 2, #PLACEHOLDER, check literature for typical alighting times per passenger
 }
 
 
 # --- TICKET_SCAN ---
 TICKET_SCAN: Dict[str, Any] = {
-	'ScanTimePerTicket': 2,  # seconds per ticket
-	'NumScanLanes': 2,
+	'ScanTimePerTicket': 2,  # seconds per ticket, PLACEHOLDER, check literature for typical ticket scanning times
+	'NumScanLanes': 2, #PLACEHOLDER, check literature for typical number of scan lanes
 }
 
 
 # --- VISITOR ---
 VISITOR: Dict[str, Any] = {
-	'WalkToShuttlebus': 300,
-	'WalkToTicketScan': 120,
+	'WalkToShuttlebus': 300, #PLACEHOLDER, check route
+	'WalkToTicketScan': 120, #PLACEHOLDER, check route
 }
 
 
 # --- VISITOR_GENERATOR ---
 VISITOR_GENERATOR: Dict[str, Any] = {
-	# inter-departure distribution parameters (example):
+	# inter-departure distribution parameters (example): PLACEHOLDER; replace with real distribution parameters or objects
 	# {'dist': 'exponential', 'rate': 0.01}
 	'InterDepartDistributionParams': {'dist': 'exponential', 'rate': 0.001},
 
@@ -122,12 +125,6 @@ VISITOR_GENERATOR: Dict[str, Any] = {
 	# e.g. {'car': 0.6, 'shuttle': 0.3, 'walk': 0.1}
 	'ModeSplit': {'car': 0.6, 'shuttle': 0.3, 'walk': 0.1},
 }
-
-
-def init_runtime_objects() -> None:
-	"""Create and assign runtime-only objects (queues, locks, etc.)."""
-	if CAR.get('MyCarQueue') is None:
-		CAR['MyCarQueue'] = Queue()
 
 
 # Flat registry of sections for convenience

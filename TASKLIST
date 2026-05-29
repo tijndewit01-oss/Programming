@@ -1,0 +1,94 @@
+'''
+Tasklist: (X is done, N is done for Now, W is Working on it)
+
+Phase 1: Setup
+X Set up structure of the simulation code
+N Define global parameters and constants (Partly done, needs lot of updates)
+N Define output data structures and visualization tools
+
+Phase 2: Data preparation
+X Load and parse road network data into a directed graph structure
+- Map loop detector measurement points to road network edges (with direction)
+- Load visitor arrival timestamp data and fit an arrival distribution
+- Load visitor hometown data and compute entry point probability weights
+- Load non-festival loop detector data and calibrate LW model parameters (u_max, ρ_max) per segment
+- Load festival-day loop detector data and store separately for later validation
+
+Phase 3: Traffic Flow Model
+
+N Implement Greenshields velocity function: u(ρ) = u_max * (1 - ρ/ρ_max)
+N Implement travel time computation per road segment given current density
+N Implement shared TrafficDensity counter structure for all segments
+- Update gridlock to crawling speed (right now, vehicles get disabled at max road density)
+
+Phase 4: Core Simulation Components
+- Implement TVisitorGenerator: spawns visitors using fitted arrival distribution, assigns transport mode and entry point
+- Implement TVisitor: handles walking, queue joining, passivation, and arrival logging
+- Implement TCarGenerator: manages car slot semaphore, samples car capacity
+- Implement TCar: road traversal using LW model, parking lot queuing, passenger reactivation, node logging
+- Implement TShuttleBus: boarding, route traversal, alighting, return trip, trip logging (for N buses)
+- Implement TTicketScan: FIFO queue with fixed scan time per visitor
+- Implement Initialization: instantiate all components, load data, start processes
+
+Phase 5: Output Logging
+- Log per-visitor data: entry point, transport mode, depart time, arrival time, time per journey phase
+- Log per-car data: node timestamps, segment travel times, parking queue wait
+- Log per-bus data: trip number, departure time, passenger count, trip duration
+- Log per-segment data: density sampled at fixed time intervals throughout the simulation
+- Save all logs to output files at end of simulation run
+
+Phase 6: Validation
+- Run simulation with observed parameters (real mode split, real arrival distribution)
+- Compare simulated segment densities against festival-day loop detector data
+- Adjust calibration parameters until model output matches observed data acceptably
+
+Phase 7: Scenario Parameters
+- Implement mode split as a controllable input parameter
+- Implement travel expense influence on mode split (logit or weighted utility function)
+- Implement travel comfort influence on mode split (bus frequency, walking distance)
+- Implement CO2 computation as a post-run calculation from car-km and emission factors
+- Implement carpooling incentive parameter (shifts car capacity distribution)
+- Implement staggered entry parameter (reshapes arrival distribution)
+- Implement N-bus parameter (number of shuttle buses running in parallel)
+- Implement parking lot capacity cap with spillover behaviour
+
+Phase 8: Visualisation: Road Map
+- Export segment density time series to GeoJSON format
+- Build animated Folium map with TimestampedGeoJson, colour scale green to red
+- Add hover tooltips per segment (density, speed, car count)
+- Export as self-contained .html file
+
+Phase 9: Visualisation: Static Figures
+- Build travel time histogram with mean line and percentile band
+- Build CDF of travel times alongside the histogram
+- Build segment density over time line chart with real loop detector data overlaid
+- Build mode split sensitivity grouped bar chart (travel time, density, CO2, queue wait)
+- Build CO2 stacked bar chart per scenario with reference line
+- Build bus utilisation heatmap (trip number vs departure time vs load fraction)
+- Build visitor arrival funnel as stacked area chart (time per journey phase)
+- Set up batch export of all figures to PNG
+
+Phase 10: Interactive Visualisation
+- Build Plotly Sankey diagram of visitor flow through journey phases
+- Build scenario comparison dashboard (two simulation outputs side by side)
+- Export dashboard as standalone .html
+
+Phase 11: Final Integration
+- Write a single run script that executes simulation, saves outputs, and triggers all visualisations
+- Test full pipeline end to end with one complete scenario
+- Run all planned scenarios and collect outputs
+- Review all figures for correctness and presentation quality
+
+'''
+
+'''
+The output structures:
+
+
+
+
+
+
+'''
+
+
