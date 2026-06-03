@@ -88,15 +88,15 @@ CAR: Dict[str, Any] = {
 
 	# runtime-only shared queue for cars; set in init_runtime_objects()
 	'MyCarQueue': None,  # type: Queue | None #PLACEHOLDER, idk what to do with this yet
+    
+	# {'dist': 'poisson', 'lambda': 2} or {'dist': 'custom', 'params': {...}}
+	'CarCapacityDistribution': {'dist': 'equal', 'low': 1, 'high': 3}, #PLACEHOLDER
 }
 
 
 # --- CAR_GENERATOR ---
 CAR_GENERATOR: Dict[str, Any] = {
-	# parameters describing the car capacity distribution. Example format: PLACEHOLDER; replace with real distribution parameters or objects
-	# {'dist': 'poisson', 'lambda': 2} or {'dist': 'custom', 'params': {...}}
-	'CarCapacityDistribution': {'dist': 'fixed', 'value': 4}, #PLACEHOLDER
-    
+	# parameters describing the car capacity distribution. Example format: PLACEHOLDER; replace with real distribution parameters or objects    
 	#Car timeout time
     'CarTimeout': 60, #seconds
 }

@@ -16,9 +16,9 @@ N Load visitor arrival timestamp data and fit an arrival distribution
 
 Phase 3: Traffic Flow Model
 
-N Implement Greenshields velocity function: u(ρ) = u_max * (1 - ρ/ρ_max)
-N Implement travel time computation per road segment given current density
-N Implement shared TrafficDensity counter structure for all segments
+X Implement Greenshields velocity function: u(ρ) = u_max * (1 - ρ/ρ_max)
+X Implement travel time computation per road segment given current density
+X Implement shared TrafficDensity counter structure for all segments
 - Update gridlock to crawling speed (right now, vehicles get disabled at max road density)
 
 Phase 4: Core Simulation Components
