@@ -9,7 +9,6 @@ import config
 
 EdgeKey = Tuple[int, int]  # (u, v) node IDs
 
-_u_max_default: float = config.TRAFFIC_MODEL['u_max']
 
 
 class TrafficDensityMap:
@@ -24,12 +23,14 @@ class TrafficDensityMap:
         self._density: Dict[EdgeKey, float] = {}
         self._rho_max: Dict[EdgeKey, float] = {}
         self._u_max_ms: Dict[EdgeKey, float] = {}
+        self._length: Dict[EdgeKey, float] = {}
 
-    def init_edge(self, u: int, v: int, rho_max: float, u_max_ms: float) -> None:
+    def init_edge(self, u: int, v: int, rho_max: float, u_max_ms: float, length: float) -> None:
         """Register an edge with its capacity; initial density is 0."""
         key = (u, v)
         self._rho_max[key] = rho_max
         self._u_max_ms[key] = u_max_ms
+        self._length[key] = length
         self._density.setdefault(key, 0.0)
 
     def set_density(self, u: int, v: int, rho: float) -> None:
@@ -41,10 +42,13 @@ class TrafficDensityMap:
         return self._density.get((u, v), 0.0)
 
     def get_rho_max(self, u: int, v: int) -> float:
-        return self._rho_max.get((u, v), float('inf'))
+        return self._rho_max.get((u, v))
     
     def get_u_max_ms(self, u: int, v: int) -> float:
-        return self._u_max_ms.get((u, v), _u_max_default)
+        return self._u_max_ms.get((u, v)) 
+    
+    def get_length(self, u: int, v: int) -> float:
+        return self._length.get((u, v))
 
     def update_density(self, u: int, v: int, delta: float) -> None:
         self.set_density(u, v, self.get_density(u, v) + delta)
@@ -63,7 +67,7 @@ def greenshields_speed(rho: float, rho_max: float, u_max_ms: float) -> float:
     return u_max_ms * (1.0 - rho_clamped / rho_max)#PLACEHOLDER fix the crawling speed later
 
 
-def travel_time(length: float, rho: float, rho_max: float, u_max_ms: float = _u_max_default) -> float:
+def travel_time(length: float, rho: float, rho_max: float, u_max_ms: float) -> float:
     """Travel time (seconds) for a segment given its length and current density.
 
     Returns inf when the segment is gridlocked.
@@ -74,31 +78,39 @@ def travel_time(length: float, rho: float, rho_max: float, u_max_ms: float = _u_
     return length / speed
 
 
-def edge_travel_time(u: int, v: int, length: float,
-                     density_map: TrafficDensityMap) -> float:
+def edge_travel_time(u: int, v: int, density_map: TrafficDensityMap) -> float:
     """Convenience wrapper that pulls rho and rho_max from the shared density map."""
     rho = density_map.get_density(u, v)
     rho_max = density_map.get_rho_max(u, v)
     u_max_ms = density_map.get_u_max_ms(u, v)
+    length = density_map.get_length(u, v)
     return travel_time(length, rho, rho_max, u_max_ms)
 
 
 def init_from_graph(G: nx.MultiDiGraph, density_map: "TrafficDensityMap | None" = None) -> TrafficDensityMap:
     """Populate a TrafficDensityMap from an OSMnx graph.
 
-    Each edge must have a 'rho_max' attribute (set by Prepare_network.py).
+    Each edge must have a 'rho_max' attribute (set by Prepare_network.py)
+    and a 'u_max_ms' attribute.
     If density_map is None, the module-level traffic_density is used.
     """
     target = density_map if density_map is not None else traffic_density
     for u, v, data in G.edges(data=True):
         rho_max = data.get('rho_max', float('inf'))
         u_max_ms = data.get('u_max_ms', config.TRAFFIC_MODEL['speed_fallback'] / 3.6) # default to fallback speed in m/s
-        target.init_edge(u, v, rho_max, u_max_ms)
+        length = data.get('length', 0.0)
+        target.init_edge(u, v, rho_max, u_max_ms, length)
     return target
 
 
-def weight_func():
-    
+   
+
+
+def shortest_path(G: nx.MultiDiGraph, source: int, target: int, density_map: TrafficDensityMap) -> list[int]:
+    def weight(u, v, data):
+        return edge_travel_time(u, v, density_map)
+    return nx.shortest_path(G, source, target, weight=weight)
+
 
 
 # Module-level shared density map used across the simulation

@@ -46,6 +46,12 @@ ROAD_NETWORK: Dict[str, Any] = {
 	'RoadNetwork': [],  # type: List[RoadEdge] PLACEHOLDER FOR LOADED DATA
 	'TrafficDensity': [],  # type: List[Tuple[NodeID, int]]
 	'LoadFunction': None,  # Optional callable to populate the above
+    
+
+
+	#Starting Nodes for the cars and bus
+    'CarStartNodes':  {'location1': [1,2], 'location2': [3,4], 'location3': [5,6], 'location4': [7,8], 'location5': [9,10], 'bus_start': [11,12]}, #PLACEHOLDER, check route
+
 }
 
 
