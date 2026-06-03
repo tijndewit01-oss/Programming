@@ -1,5 +1,7 @@
 from scipy.stats import gamma
 
+from Functions.TVisitor import TVisitor
+
 #Creating the visitor generator in a class
 #Based on the number of visitors and the gamma distribution parameters in config
 
