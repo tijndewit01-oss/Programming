@@ -4,6 +4,10 @@ import networkx as nx
 import osmium
 import xml.etree.ElementTree as ET
 
+'''
+Converts road data from JSON format to OSM XML format.
+'''
+
 def osm_json_to_xml(json_path, xml_path):
     with open(json_path, "r") as f:
         data = json.load(f)

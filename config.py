@@ -29,10 +29,11 @@ RoadEdge = Tuple[NodeID, NodeID, Distance]
 # --- SIMULATION ---
 SIMULATION: Dict[str, Any] = {
 	# total number of visitors in the simulation
-	'NumberVisitors': 1000, #PLACEHOLDER
+	'NumberVisitors': 5100, #PLACEHOLDER
 
 	# event ending time in simulation time units (e.g., seconds)
-	'EventEndingTime': 36000, #PLACEHOLDER (Simulation is over 3 days with varying timescales, need to look how to fix)
+    'EventStartTime': 64800, #18:00 in seconds
+	'EventEndingTime': 86400, #24:00 in seconds (Friday)
 
 	# time unit description (for documentation only)
 	'TimeUnit': 'seconds',
@@ -51,7 +52,7 @@ ROAD_NETWORK: Dict[str, Any] = {
 # --- TRAFFIC_MODEL ---
 TRAFFIC_MODEL: Dict[str, Any] = {
 	# free-flow speed (u_max) units consistent with distances/time
-	'u_max': 20.0, #PLACEHOLDER, Is road dependent so need to change to dict of road id
+	'speed_fallback': 30.0, #In case the osm had no speed limit, default to 30 kph (8.33 m/s)
 
 	# average space one car occupies on the road (bumper-to-bumper, meters)
 	'Car_Spacing': 7.5,
@@ -88,6 +89,9 @@ CAR_GENERATOR: Dict[str, Any] = {
 	# parameters describing the car capacity distribution. Example format: PLACEHOLDER; replace with real distribution parameters or objects
 	# {'dist': 'poisson', 'lambda': 2} or {'dist': 'custom', 'params': {...}}
 	'CarCapacityDistribution': {'dist': 'fixed', 'value': 4}, #PLACEHOLDER
+    
+	#Car timeout time
+    'CarTimeout': 60, #seconds
 }
 
 
@@ -119,11 +123,15 @@ VISITOR: Dict[str, Any] = {
 VISITOR_GENERATOR: Dict[str, Any] = {
 	# inter-departure distribution parameters (example): PLACEHOLDER; replace with real distribution parameters or objects
 	# {'dist': 'exponential', 'rate': 0.01}
-	'InterDepartDistributionParams': {'dist': 'exponential', 'rate': 0.001},
+	'InterDepartDistributionParams': {'dist': 'gamma', 'kappa' : 1.4593, 'theta': 4606.5, 'shift': 66271.6}, 
 
 	# mode split fractions: share of visitors choosing each mode (sum to 1)
 	# e.g. {'car': 0.6, 'shuttle': 0.3, 'walk': 0.1}
-	'ModeSplit': {'car': 0.6, 'shuttle': 0.3, 'walk': 0.1},
+	'ModeSplit': {'car': 0.6, 'shuttle': 0.4},
+    
+	#Start node for cars probability
+    'CarStartNode': {'node1': 0.2, 'node2': 0.2, 'node3': 0.2, 'node4': 0.2, 'node5': 0.2}, #PLACEHOLDER, check route
+	'BusStartNode': 'bus_start_node_id', #PLACEHOLDER, check route
 }
 
 
