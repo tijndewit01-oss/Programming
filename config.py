@@ -65,6 +65,7 @@ TRAFFIC_MODEL: Dict[str, Any] = {
 
 	# optional speed function: f(density or car_count) -> speed
 	'SpeedFunction': None, #PLACEHOLDER, is based on a specific model
+    
 }
 
 
@@ -130,8 +131,8 @@ VISITOR_GENERATOR: Dict[str, Any] = {
 	'ModeSplit': {'car': 0.6, 'shuttle': 0.4},
     
 	#Start node for cars probability
-    'CarStartNode': {'node1': 0.2, 'node2': 0.2, 'node3': 0.2, 'node4': 0.2, 'node5': 0.2}, #PLACEHOLDER, check route
-	'BusStartNode': 'bus_start_node_id', #PLACEHOLDER, check route
+    'CarStartNodeProb': {'node1': 0.2, 'node2': 0.2, 'node3': 0.2, 'node4': 0.2, 'node5': 0.2}, #PLACEHOLDER, check route
+	'BusStartNodeProb': 'bus_start_node_id', #PLACEHOLDER, check route
 }
 
 

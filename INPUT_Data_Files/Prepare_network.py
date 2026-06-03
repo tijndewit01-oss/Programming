@@ -45,7 +45,7 @@ for u, v, data in G.edges(data=True):
     except:
         u_max = config.TRAFFIC_MODEL['speed_fallback'] # default to 30 kph if conversion fails
     u_max_ms = u_max / 3.6 #convert to m/s
-    data['u_max_speed'] = u_max_ms
+    data['u_max_ms'] = u_max_ms
     if isinstance(lanes_raw, list):
         lanes = int(lanes_raw[0])
     else:
