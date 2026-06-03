@@ -22,8 +22,8 @@ X Implement shared TrafficDensity counter structure for all segments
 - Update gridlock to crawling speed (right now, vehicles get disabled at max road density)
 
 Phase 4: Core Simulation Components
-W Implement TVisitorGenerator: spawns visitors using fitted arrival distribution, assigns transport mode and entry point
-W Implement TVisitor: handles walking, queue joining, passivation, and arrival logging
+X Implement TVisitorGenerator: spawns visitors using fitted arrival distribution, assigns transport mode and entry point
+X Implement TVisitor: handles walking, queue joining, passivation, and arrival logging
 W Implement TCarGenerator: manages car slot semaphore, samples car capacity
 W Implement TCar: road traversal using LW model, parking lot queuing, passenger reactivation, node logging
 W Implement TShuttleBus: boarding, route traversal, alighting, return trip, trip logging (for N buses)
