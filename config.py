@@ -66,8 +66,6 @@ TRAFFIC_MODEL: Dict[str, Any] = {
 	# maximum density (rho_max) vehicles per unit length; computed per edge in Data.py as (length / CAR_SPACING) * lanes
 	'rho_max': 200.0, #PLACEHOLDER, overridden per edge in Data.py
 
-	# passenger car equivalents for buses (how many cars a bus counts as)
-	'bus_equivalent': 2.5, #PLACEHOLDER, Check literature
 
 	# optional speed function: f(density or car_count) -> speed
 	'SpeedFunction': None, #PLACEHOLDER, is based on a specific model
@@ -109,6 +107,8 @@ SHUTTLE_BUS: Dict[str, Any] = {
 	'MaxWaitTime': 300,  # seconds, PLACEHOLDER, check literature for typical shuttle bus wait times
 	'BoardingTimePerPassenger': 3, #PLACEHOLDER, check literature for typical boarding times per passenger
 	'AlightingTimePerPassenger': 2, #PLACEHOLDER, check literature for typical alighting times per passenger
+	# passenger car equivalents for buses (how many cars a bus counts as)
+	'bus_equivalent': 3, #PLACEHOLDER, Check literature
 }
 
 

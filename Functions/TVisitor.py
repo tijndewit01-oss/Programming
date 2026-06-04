@@ -1,4 +1,5 @@
 import numpy as np
+import config
 #Creates the TVisitor class
 
 
@@ -21,9 +22,8 @@ class TVisitor:
     These should be simpy.Store instances created once the SimPy env exists.
     """
 
-    def __init__(self, env, config):
+    def __init__(self, env):
         self.env = env
-        self.config = config
 
         #Determine the mode of transport for the visitor based on the mode split in config
         mode_split = config.VISITOR_GENERATOR['ModeSplit']

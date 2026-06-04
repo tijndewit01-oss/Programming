@@ -31,8 +31,8 @@ G = ox.graph_from_xml("INPUT_Data_Files/network.osm")
 # print(G.number_of_edges())
 
 
-# ox.plot_graph(G)
-# plt.show()
+ox.plot_graph(G)
+plt.show()
 
 
 Car_Spacing = config.TRAFFIC_MODEL['Car_Spacing']

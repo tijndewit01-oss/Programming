@@ -1,4 +1,5 @@
 from scipy.stats import gamma
+import config
 
 from Functions.TVisitor import TVisitor
 
@@ -8,7 +9,7 @@ from Functions.TVisitor import TVisitor
 class TVisitorGenerator:
 
 
-    def __init__(self, env, config):
+    def __init__(self, env):
         #Get the randomized inter departure times for the visitors based on the gamma distribution parameters in config
         inter_depart_params = gamma.rvs(a=config.VISITOR_GENERATOR['InterDepartDistributionParams']['kappa'],
                                         scale=config.VISITOR_GENERATOR['InterDepartDistributionParams']['theta'],
@@ -19,7 +20,6 @@ class TVisitorGenerator:
 
 
         self.env = env
-        self.config = config
         self.process = env.process(self.run())
     
 

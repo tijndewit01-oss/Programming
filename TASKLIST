@@ -22,12 +22,12 @@ X Implement shared TrafficDensity counter structure for all segments
 N Update gridlock to crawling speed (right now, vehicles get disabled at max road density)
 
 Phase 4: Core Simulation Components
-X Implement TVisitorGenerator: spawns visitors using fitted arrival distribution, assigns transport mode and entry point
-X Implement TVisitor: handles walking, queue joining, passivation, and arrival logging
+W Implement TVisitorGenerator: spawns visitors using fitted arrival distribution, assigns transport mode and entry point
+W Implement TVisitor: handles walking, queue joining, passivation, and arrival logging
 X Implement TCarGenerator: manages car slot semaphore, samples car capacit
-X (waiting for RoadNetwork.py)Implement TCar: road traversal using LW model, parking lot queuing, passenger reactivation, node logging
-W (Waiting for RoadNetwork.py)Implement TShuttleBus: boarding, route traversal, alighting, return trip, trip logging (for N buses)
-X Implement TTicketScan: FIFO queue with fixed scan time per visitor
+X Implement TCar: road traversal using LW model, parking lot queuing, passenger reactivation, node logging
+X Implement TShuttleBus: boarding, route traversal, alighting, return trip, trip logging (for N buses)
+W (FIX QUEUE'S TO MAIN) Implement TTicketScan: FIFO queue with fixed scan time per visitor
 - Implement Initialization: instantiate all components, load data, start processes
 
 Phase 5: Output Logging
@@ -86,6 +86,12 @@ The output structures:
 
 
 
+Bas: Clean up functions, fix queueus
+when done start on initialization
+
+
+Tijn: Fix imports of data/nodes
+when done, see whats next
 
 
 

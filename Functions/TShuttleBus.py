@@ -1,6 +1,8 @@
 #The TShuttleBus class (PDL: TShuttleBus)
+from osmnx import shortest_path
 import simpy
-
+from Functions.Trafficflowmodel import edge_travel_time
+import config
 
 class TShuttleBus:
     """Shuttle fleet that transports public-transport visitors from the NS station
@@ -23,25 +25,18 @@ class TShuttleBus:
     a fixed DRIVE_TIME until roadnetwork.py (GetRoute / GetDistance) is ready.
     """
 
-    DRIVE_TIME_PLACEHOLDER = 300  # seconds, fixed one-way station <-> festival
 
-    def __init__(self, env, config):
+    def __init__(self, env, busqueue):
         self.env = env
-        self.config = config
-
-        # Shared boarding queue at the shuttle stop (PDL: MyBusQueue)
-        self.queue = simpy.Store(env)
-        config.SHUTTLE_BUS['MyBusQueue'] = self.queue
+        self.busqueue = busqueue
 
         self.capacity = config.SHUTTLE_BUS['capacity']
         self.max_wait = config.SHUTTLE_BUS['MaxWaitTime']
         self.boarding_time = config.SHUTTLE_BUS['BoardingTimePerPassenger']
         self.alighting_time = config.SHUTTLE_BUS['AlightingTimePerPassenger']
-        # PCU equivalent for traffic density; used once road-network routing exists
-        self.bus_equivalent = config.TRAFFIC_MODEL['bus_equivalent']
-
-        # Output: (bus_id, trip_index, duration) per completed festival-bound trip
-        self.trip_lengths = []
+        self.bus_equivalent = config.SHUTTLE_BUS['bus_equivalent']
+        self.source = config.ROAD_NETWORK['StationNode']
+        self.destination = config.ROAD_NETWORK['ParkingLotNode']
 
         n_buses = config.SHUTTLE_BUS['n_buses']
         self.processes = [env.process(self.run(bus_id)) for bus_id in range(n_buses)]
@@ -53,13 +48,16 @@ class TShuttleBus:
         from when boarding started, so time already spent waiting for passengers
         counts toward it (a bus that filled slowly needs no extra boarding wait).
         Returns the list of boarded visitors.
+
+        Edited to wait the board time everytime a passenger boards. It just drives away after the process is done.
         """
         passengers = []
         wait_start = self.env.now
         deadline = wait_start + self.max_wait
         while len(passengers) < self.capacity:
-            if len(self.queue.items) > 0:
+            if len(self.queue.items) > 0: 
                 visitor = yield self.queue.get()       # FirstOfQueue + LeaveQueue
+                yield self.env.timeout(self.boarding_time)
                 passengers.append(visitor)
                 continue
             remaining = deadline - self.env.now
@@ -68,13 +66,11 @@ class TShuttleBus:
             get = self.queue.get()
             result = yield get | self.env.timeout(remaining)
             if get in result:
+                yield self.env.timeout(self.boarding_time)
                 passengers.append(result[get])
             else:
                 get.cancel()  # release the pending get so it can't grab a visitor later
                 break
-
-        boarding_done = wait_start + len(passengers) * self.boarding_time
-        yield self.env.timeout(max(0, boarding_done - self.env.now))
         return passengers
 
     def run(self, bus_id):
@@ -90,16 +86,25 @@ class TShuttleBus:
                 continue
 
             # --- drive to the festival (PLACEHOLDER for road-network routing) ---
-            depart = self.env.now
-            yield self.env.timeout(self.DRIVE_TIME_PLACEHOLDER)
-            arrive = self.env.now
-            self.trip_lengths.append((bus_id, trip_index, arrive - depart))
-            trip_index += 1
+
+            self.path = shortest_path(self.G, self.source, self.destination, self.density_map)
+            for u, v in zip(self.path[:-1], self.path[1:]):
+                self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
+                travel_time = edge_travel_time(u, v, self.density_map)
+                yield self.env.timeout(travel_time)
+                self.density_map.update_density(u, v, -self.bus_equivalent) # Decrement density after traversing
+
+
 
             # --- discharge passengers at the festival parking area ---
-            yield self.env.timeout(len(passengers) * self.alighting_time)
             for visitor in passengers:
+                yield self.env.timeout(self.alighting_time)
                 visitor.reactivate()  # visitor walks on to the ticket scan
 
             # --- drive back to the station, empty (PLACEHOLDER) ---
-            yield self.env.timeout(self.DRIVE_TIME_PLACEHOLDER)
+            self.path = shortest_path(self.G, self.destination, self.source, self.density_map)
+            for u, v in zip(self.path[:-1], self.path[1:]):
+                self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
+                travel_time = edge_travel_time(u, v, self.density_map)
+                yield self.env.timeout(travel_time)
+                self.density_map.update_density(u, v, -self.bus_equivalent) # Decrement density after traversing
