@@ -43,12 +43,7 @@ SIMULATION: Dict[str, Any] = {
 # --- ROAD_NETWORK ---
 # placeholders; actual network should be loaded from files into these fields
 ROAD_NETWORK: Dict[str, Any] = {
-	'RoadNetwork': [],  # type: List[RoadEdge] PLACEHOLDER FOR LOADED DATA
-	'TrafficDensity': [],  # type: List[Tuple[NodeID, int]]
-	'LoadFunction': None,  # Optional callable to populate the above
-    
-
-
+	'TrafficDensityLocal': 20,  # PLACEHOLDER, percentage of data
 	#Starting Nodes for the cars and bus
     'CarStartNodes':  {'location1': 1, 'location2': 2, 'location3': 3, 'location4': 4, 'location5': 5, 'bus_start': 6}, #PLACEHOLDER, check route
 	'ParkingLotNode': 111
