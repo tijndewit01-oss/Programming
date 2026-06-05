@@ -33,7 +33,7 @@ SIMULATION: Dict[str, Any] = {
 
 	# event ending time in simulation time units (e.g., seconds)
     'EventStartTime': 64800, #18:00 in seconds
-	'EventEndingTime': 86400, #24:00 in seconds (Friday)
+	'EventEndingTime': 86400, #24:00 in seconds (Saturday)
 
 	# time unit description (for documentation only)
 	'TimeUnit': 'seconds',
@@ -44,9 +44,13 @@ SIMULATION: Dict[str, Any] = {
 # placeholders; actual network should be loaded from files into these fields
 ROAD_NETWORK: Dict[str, Any] = {
 	'TrafficDensityLocal': 20,  # PLACEHOLDER, percentage of data
+    'N_road_speed': 80, #kph, n Road snelheid
 	#Starting Nodes for the cars and bus
     'CarStartNodes':  {'location1': 1, 'location2': 2, 'location3': 3, 'location4': 4, 'location5': 5, 'bus_start': 6}, #PLACEHOLDER, check route
-	'ParkingLotNode': 111
+	'ParkingLotNode': 111,
+    'Interpolate': 1200, #Seconds (must be a whole minute) of interpolation time 
+    					#for the traffic density update (so time before + after hour change)
+    'N_local': 0.2 #Conversion of flow rate from N roads and local in percentage
 }
 
 
