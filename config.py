@@ -44,7 +44,11 @@ SIMULATION: Dict[str, Any] = {
 # placeholders; actual network should be loaded from files into these fields
 ROAD_NETWORK: Dict[str, Any] = {
 
-    'StartNodes':  {'Node1': 46354890, 'Node2': 46336597, 'Node3': 3620826627, 'Node4': 46493064, 'Node5': 3611512307, 'Bus_start': 46477307, 'Parkinglot': 46445656} ,
+    'StartNodes':  {'Node1': 46354890, 'Node2': 46336597, 'Node3': 3620826627, 'Node4': 46493064, 'Node5': 3611512307},
+    'CarStartNodeProb': {'Node1': 0.4854844416, 'Node2': 0.009832219139, 'Node3': 0.02623787267, 'Node4': 0.0528667995, 'Node5': 0.24214074226}, #PLACEHOLDER, check route
+    
+    'Bus_start': 46477307,
+    'Parkinglot': 46445656,
 
     'Interpolate': 1200, #Seconds (must be a whole minute) of interpolation time 
     					#for the traffic density update (so time before + after hour change)
@@ -122,9 +126,7 @@ VISITOR_GENERATOR: Dict[str, Any] = {
 	# e.g. {'car': 0.6, 'shuttle': 0.3, 'walk': 0.1}
 	'ModeSplit': {'car': 0.6, 'shuttle': 0.4},
     
-	#Start node for cars probability
-    'CarStartNodeProb': {'node1': 0.2, 'node2': 0.2, 'node3': 0.2, 'node4': 0.2, 'node5': 0.2}, #PLACEHOLDER, check route
-	'BusStartNodeProb': 'bus_start_node_id', #PLACEHOLDER, check route
+
 }
 
 

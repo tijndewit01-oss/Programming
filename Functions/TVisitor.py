@@ -22,19 +22,28 @@ class TVisitor:
     These should be simpy.Store instances created once the SimPy env exists.
     """
 
-    def __init__(self, env):
+    def __init__(self, env, busqueue, carqueues, ticketqueue):
         self.env = env
 
         #Determine the mode of transport for the visitor based on the mode split in config
         mode_split = config.VISITOR_GENERATOR['ModeSplit']
         self.mode = np.random.choice(list(mode_split.keys()), p=list(mode_split.values()))
+        self.shuttlebus_walktime = config.VISITOR['Dist_WalkToShuttlebus'] / config.VISITOR['VisitorWalkSpeed']
+        self.ticket_walktime = config.VISITOR['Dist_WalkToTicketScan'] / config.VISITOR['VisitorWalkSpeed']
 
+
+        self.busqueue = busqueue
+        self.carqueues = carqueues
+        self.ticketqueue = ticketqueue
         #Determine start node if mode is car
         if self.mode == 'car':
-            start_node_split = config.VISITOR_GENERATOR['CarStartNodeProb']
-            self.start_node = np.random.choice(list(start_node_split.keys()), p=list(start_node_split.values()))
+            start_node_prob = config.ROAD_NETWORK['CarStartNodeProb']
+            start_node_ids = config.ROAD_NETWORK['StartNodes']
+            self.start_node_name = np.random.choice(list(start_node_prob.keys()), p=list(start_node_prob.values()))
+            self.start_node = start_node_ids[self.start_node_name]
         else:
-            self.start_node = config.VISITOR_GENERATOR['BusStartNodeProb']
+            self.start_node_name = 'Bus_Start'
+            self.start_node = config.ROAD_NETWORK['Bus_Start']
 
         # PDL attributes
         self.depart_time = env.now   # DepartTime = Now
@@ -54,19 +63,19 @@ class TVisitor:
         # --- get to the parking area / drop-off, depending on mode ---
         if self.mode != 'car':
             # Public transport: walk to the shuttle stop and queue for the bus
-            yield self.env.timeout(self.config.VISITOR['WalkToShuttlebus'])
-            self.config.SHUTTLE_BUS['MyBusQueue'].put(self)   # EnterQueue
+            yield self.env.timeout(self.shuttlebus_walktime)
+            self.busqueue.put(self)   # EnterQueue
             yield self._wake                                  # Passivate; bus reactivates
             self._wake = self.env.event()
         else:
             # Car: join the carpool queue and wait until the car has parked
-            self.config.CAR['MyCarQueue'].put(self)           # EnterQueue
+            self.carqueues[self.start_node_name] .put(self)         # EnterQueue
             yield self._wake                                  # Passivate; car reactivates
             self._wake = self.env.event()
 
         # --- both modes merge here: walk to the ticket scan and get scanned ---
-        yield self.env.timeout(self.config.VISITOR['WalkToTicketScan'])
-        self.config.TICKET_SCAN['MyQueue'].put(self)          # EnterQueue
+        yield self.env.timeout(self.ticket_walktime)
+        self.ticketqueue.put(self)          # EnterQueue
         yield self._wake                                      # Passivate; scanner reactivates
 
         # ArrivalTime = Now (visitor has passed the festival entrance)

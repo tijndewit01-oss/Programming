@@ -15,19 +15,22 @@ class TCar:
         self.density_map = density_map
         self.parking_lot = parking_lot
         self.car_full_event = env.event()
+        self.parking_lot_node = config.ROAD_NETWORK['ParkingLotNode']
+        self.max_wait_time = config.CAR['max_wait_time']
+        carcap_low = config.CAR['CarCapacityDistribution']['low']
+        carcap_high = config.CAR['CarCapacityDistribution']['high']
 
         #Initialize capacity resource
-        self.passenger_resource = simpy.Resource(env, np.random.randint(
-            config.CAR['CarCapacityDistribution']['low'], config.CAR['CarCapacityDistribution']['high']+1)) 
+        self.passenger_resource = simpy.Resource(env, np.random.randint(carcap_low, carcap_high+1)) 
         
         self.process = env.process(self.run())
 
 
     def run(self):
         yield simpy.AnyOf(self.env, 
-            [self.env.timeout(config.CAR['max_wait_time']),
+            [self.env.timeout(self.max_wait_time) # and not empty,
             self.car_full_event])
-        self.path = shortest_path(self.G, self.source, config.ROAD_NETWORK['ParkingLotNode'], self.density_map)
+        self.path = shortest_path(self.G, self.source, self.parking_lot_node , self.density_map)
         for u, v in zip(self.path[:-1], self.path[1:]):
             self.density_map.update_density(u, v, 1) # Increment density for this edge
             travel_time = edge_travel_time(u, v, self.density_map)

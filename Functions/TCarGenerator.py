@@ -61,16 +61,14 @@ class TCarGenerator:
         self.G = G
         self.density_map = density_map
         self.parking_lot = parking_lot
-
-
-
+        self.start_nodes = config.ROAD_NETWORK['StartNodes']
 
         self.process = env.process(self.run())
 
 
 
     def run(self):
-        for node in config.ROAD_NETWORK['CarStartNodes']:
+        for node in self.start_nodes:
             self.env.process(self.manage_node(node))
         yield self.env.timeout(0)
 

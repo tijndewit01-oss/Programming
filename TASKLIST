@@ -9,8 +9,8 @@ N Define output data structures and visualization tools
 Phase 2: Data preparation
 X Load and parse road network data into a directed graph structure
 X Map loop detector measurement points to road network edges (with direction)
-N Load visitor arrival timestamp data and fit an arrival distribution
-- Load visitor hometown data and compute entry point probability weights
+X Load visitor arrival timestamp data and fit an arrival distribution
+X Load visitor hometown data and compute entry point probability weights
 x Load non-festival loop detector data and calibrate LW model parameters (u_max, ρ_max) per segment
 x Load festival-day loop detector data and store separately for later validation
 
