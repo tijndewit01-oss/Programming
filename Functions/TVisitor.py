@@ -69,7 +69,7 @@ class TVisitor:
             self._wake = self.env.event()
         else:
             # Car: join the carpool queue and wait until the car has parked
-            self.carqueues[self.start_node_name] .put(self)         # EnterQueue
+            self.carqueues[self.start_node] .put(self)         # EnterQueue
             yield self._wake                                  # Passivate; car reactivates
             self._wake = self.env.event()
 

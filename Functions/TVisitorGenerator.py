@@ -9,7 +9,7 @@ from Functions.TVisitor import TVisitor
 class TVisitorGenerator:
 
 
-    def __init__(self, env):
+    def __init__(self, env, busqueue, carqueues, ticketqueue):
         #Get the randomized inter departure times for the visitors based on the gamma distribution parameters in config
         inter_depart_params = gamma.rvs(a=config.VISITOR_GENERATOR['InterDepartDistributionParams']['kappa'],
                                         scale=config.VISITOR_GENERATOR['InterDepartDistributionParams']['theta'],
@@ -20,6 +20,11 @@ class TVisitorGenerator:
 
 
         self.env = env
+        self.busqueue = busqueue
+        self.carqueues = carqueues
+        self.ticketqueue = ticketqueue
+
+
         self.process = env.process(self.run())
     
 
@@ -30,4 +35,4 @@ class TVisitorGenerator:
             #Wait for the inter-departure time before generating the next visitor
             yield self.env.timeout(wait_time)
             #Generate a visitor
-            TVisitor(self.env, self.config)
+            TVisitor(self.env, self.busqueue, self.carqueues, self.ticketqueue)

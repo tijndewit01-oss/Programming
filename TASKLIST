@@ -1,34 +1,33 @@
 '''
-Tasklist: (X is done, N is done for Now, W is Working on it)
+Tasklist: (X = done, N = done for Now, W = working on it, - = not started)
 
 Phase 1: Setup
 X Set up structure of the simulation code
-N Define global parameters and constants (Partly done, needs lot of updates)
-N Define output data structures and visualization tools
+N Define global parameters and constants (config.py solid; some PLACEHOLDERs remain)
+N Define output data structures and visualization tools (planned, not implemented)
 
 Phase 2: Data preparation
-X Load and parse road network data into a directed graph structure
-X Map loop detector measurement points to road network edges (with direction)
-X Load visitor arrival timestamp data and fit an arrival distribution
-X Load visitor hometown data and compute entry point probability weights
-x Load non-festival loop detector data and calibrate LW model parameters (u_max, ρ_max) per segment
-x Load festival-day loop detector data and store separately for later validation
+X Load and parse road network data into a directed graph structure (RoadData_converter + Prepare_network)
+X Map loop detector measurement points to road network edges (find_nodes.py)
+X Load visitor arrival timestamp data and fit an arrival distribution (gamma params in config)
+X Load visitor hometown data and compute entry point probability weights (CarStartNodeProb in config)
+X Load non-festival loop detector data and calibrate LW model parameters per segment (roaddata_prep + background_density_update)
+X Load festival-day loop detector data and store separately for later validation (roaddata_prep)
 
 Phase 3: Traffic Flow Model
-
 X Implement Greenshields velocity function: u(ρ) = u_max * (1 - ρ/ρ_max)
 X Implement travel time computation per road segment given current density
 X Implement shared TrafficDensity counter structure for all segments
-N Update gridlock to crawling speed (right now, vehicles get disabled at max road density)
+N Update gridlock to crawling speed (near-jam workaround exists; proper crawl speed not yet set)
 
 Phase 4: Core Simulation Components
-W Implement TVisitorGenerator: spawns visitors using fitted arrival distribution, assigns transport mode and entry point
-W Implement TVisitor: handles walking, queue joining, passivation, and arrival logging
-X Implement TCarGenerator: manages car slot semaphore, samples car capacit
-X Implement TCar: road traversal using LW model, parking lot queuing, passenger reactivation, node logging
-X Implement TShuttleBus: boarding, route traversal, alighting, return trip, trip logging (for N buses)
-W (FIX QUEUE'S TO MAIN) Implement TTicketScan: FIFO queue with fixed scan time per visitor
-- Implement Initialization: instantiate all components, load data, start processes
+X Implement TVisitorGenerator: logic done; 
+X Implement TVisitor: logic done;
+W Implement TCarGenerator: logic done; manage_node pattern correct; interface/import may need adjustment after fixes
+X Implement TCar: logic done;
+W Implement TShuttleBus: logic done; bugs — self.G and self.density_map not passed into constructor
+W Implement TTicketScan: logic done; queue connections to TVisitor need wiring in main
+- Implement Initialization: wire all components together in main.py (env, graph, density_map, queues, all processes)
 
 Phase 5: Output Logging
 - Log per-visitor data: entry point, transport mode, depart time, arrival time, time per journey phase
@@ -80,6 +79,82 @@ Phase 11: Final Integration
 - Review all figures for correctness and presentation quality
 
 '''
+
+
+'''
+project/
+├── main.py                  ← Entry point; currently only loads RoadData.json.
+│                               Needs to: create SimPy env, load network.pkl,
+│                               instantiate all components, start the simulation.
+│
+├── config.py                ← All static parameters, organized by section.
+│                               Sections: SIMULATION, ROAD_NETWORK, TRAFFIC_MODEL,
+│                               CAR, CAR_GENERATOR, SHUTTLE_BUS, TICKET_SCAN,
+│                               VISITOR, VISITOR_GENERATOR. No runtime objects.
+│
+├── visualisation.py         ← Empty. Will read output CSVs/JSONs and
+│                               produce all figures and maps.
+│
+├── functions/
+│   ├── TrafficFlowModel.py  ← Core traffic model. Contains:
+│   │                            - TrafficDensityMap: stores per-edge density,
+│   │                              rho_max, u_max_ms, length, background density.
+│   │                            - greenshields_speed(): u = u_max*(1 - rho/rho_max)
+│   │                            - edge_travel_time(): travel time from density map
+│   │                            - shortest_path(): Dijkstra weighted by travel time
+│   │                            - init_from_graph(): populates map from OSMnx graph
+│   │                            - background_density_update(): SimPy process that
+│   │                              updates background density hourly with interpolation
+│   │
+│   ├── TVisitorGenerator.py ← Samples N arrival times from gamma distribution,
+│   │                           sorts them, computes inter-arrival gaps, and spawns
+│   │                           one TVisitor per gap via SimPy timeouts.
+│   │
+│   ├── TVisitor.py          ← Individual visitor entity. Picks transport mode,
+│   │                           assigns start node (car) or station (bus), joins
+│   │                           the appropriate queue, passivates/reactivates
+│   │                           through each journey phase, walks to ticket scan.
+│   │
+│   ├── TCarGenerator.py     ← Spawns one manage_node() process per start node.
+│   │                           Each loop creates a new TCar and waits for its
+│   │                           departed_event before creating the next one —
+│   │                           ensuring exactly one car waits at each node at all times.
+│   │
+│   ├── TCar.py              ← Car entity. Boards visitors up to capacity or
+│   │                           max_wait_time (AnyOf pattern), signals departed_event,
+│   │                           computes shortest path, drives segment-by-segment
+│   │                           updating density before/after each yield, then
+│   │                           requests a parking lot slot.
+│   │
+│   ├── TShuttleBus.py       ← Runs N bus processes over a shared boarding queue.
+│   │                           Each bus: boards passengers up to capacity or timeout,
+│   │                           drives to festival via road network (density-aware),
+│   │                           alights passengers (reactivating each), drives back
+│   │                           empty, repeats.
+│   │
+│   └── TTicketScan.py       ← Runs NumScanLanes scanner processes over a shared
+│                               FIFO queue. Each scanner: gets next visitor, waits
+│                               scan time, reactivates visitor (journey complete).
+│
+├── Prepare_network.py       ← One-time script. Loads network.osm via OSMnx,
+│                               computes rho_max = (length/Car_Spacing)*lanes and
+│                               u_max_ms from OSM maxspeed tags, saves result as
+│                               network.pkl.
+│
+├── RoadData_converter.py    ← One-time script. Converts the raw RoadData.json
+│                               (Overpass API format) into a valid OSM XML file
+│                               that OSMnx can load.
+│
+├── roaddata_prep.py         ← One-time script. Reads Excel loop detector data,
+│                               extracts average Saturday flows per detector per hour,
+│                               saves as flow_2_3_avg.csv for use in
+│                               background_density_update().
+│
+└── find_nodes.py            ← One-time utility. Uses ox.nearest_nodes() to map
+                                GPS coordinates to OSMnx node IDs for entry points,
+                                bus stop, and parking lot.
+'''
+
 
 '''
 The output structures:
