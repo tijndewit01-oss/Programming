@@ -1,7 +1,6 @@
 #The TShuttleBus class (PDL: TShuttleBus)
-from osmnx import shortest_path
 import simpy
-from Functions.Trafficflowmodel import edge_travel_time
+from Functions.Trafficflowmodel import shortest_path, edge_travel_time
 import config
 
 class TShuttleBus:
@@ -26,8 +25,10 @@ class TShuttleBus:
     """
 
 
-    def __init__(self, env, busqueue):
+    def __init__(self, env, G, density_map, busqueue):
         self.env = env
+        self.G = G
+        self.density_map = density_map
         self.busqueue = busqueue
 
         self.capacity = config.SHUTTLE_BUS['capacity']
@@ -35,8 +36,8 @@ class TShuttleBus:
         self.boarding_time = config.SHUTTLE_BUS['BoardingTimePerPassenger']
         self.alighting_time = config.SHUTTLE_BUS['AlightingTimePerPassenger']
         self.bus_equivalent = config.SHUTTLE_BUS['bus_equivalent']
-        self.source = config.ROAD_NETWORK['StationNode']
-        self.destination = config.ROAD_NETWORK['ParkingLotNode']
+        self.source = config.ROAD_NETWORK['Bus_start']
+        self.destination = config.ROAD_NETWORK['Parkinglot']
 
         n_buses = config.SHUTTLE_BUS['n_buses']
         self.processes = [env.process(self.run(bus_id)) for bus_id in range(n_buses)]
@@ -55,15 +56,15 @@ class TShuttleBus:
         wait_start = self.env.now
         deadline = wait_start + self.max_wait
         while len(passengers) < self.capacity:
-            if len(self.queue.items) > 0: 
-                visitor = yield self.queue.get()       # FirstOfQueue + LeaveQueue
+            if len(self.busqueue.items) > 0:
+                visitor = yield self.busqueue.get()       # FirstOfQueue + LeaveQueue
                 yield self.env.timeout(self.boarding_time)
                 passengers.append(visitor)
                 continue
             remaining = deadline - self.env.now
             if remaining <= 0:
                 break                                  # depart even if not full
-            get = self.queue.get()
+            get = self.busqueue.get()
             result = yield get | self.env.timeout(remaining)
             if get in result:
                 yield self.env.timeout(self.boarding_time)

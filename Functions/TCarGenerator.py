@@ -56,11 +56,12 @@ class TCarGenerator:
     #         yield self.env.timeout(0)  # yield control so the car process can start
 
 
-    def __init__(self, env, G, density_map, parking_lot):
+    def __init__(self, env, G, density_map, parking_lot, carqueues):
         self.env = env
         self.G = G
         self.density_map = density_map
         self.parking_lot = parking_lot
+        self.carqueues = carqueues
         self.start_nodes = config.ROAD_NETWORK['StartNodes']
 
         self.process = env.process(self.run())
@@ -68,12 +69,14 @@ class TCarGenerator:
 
 
     def run(self):
-        for node in self.start_nodes:
+        # start_nodes is a {name: node_id} dict; iterate the node IDs so that
+        # the car's source matches the carqueue keys and the road-graph nodes
+        for node in self.start_nodes.values():
             self.env.process(self.manage_node(node))
         yield self.env.timeout(0)
 
     def manage_node(self, node):
         while True:
-            car = TCar(self.env, self.G, node, self.density_map, self.parking_lot)
+            car = TCar(self.env, self.G, node, self.density_map, self.parking_lot, self.carqueues)
             yield car.departed_event
             

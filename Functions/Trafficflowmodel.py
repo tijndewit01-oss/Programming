@@ -172,7 +172,7 @@ def background_density_update(env, G, density_map):
       - All other roads: local roads; flow density is scaled down by N_local, a config
         factor expressing what fraction of N-road traffic also loads the local network.
     """
-    interpolate = config.ROAD_NETWORK['interpolate']    # total width of the interpolation window around each hour boundary [s]
+    interpolate = config.ROAD_NETWORK['Interpolate']    # total width of the interpolation window around each hour boundary [s]
     convert_N_local = config.ROAD_NETWORK['N_local']    # scaling factor: converts N-road flow density to equivalent local-road background density
     flow = pd.read_csv('INPUT_Data_Files/ROAD_DATA/flow_2_3_avg.csv')['Avg Saturday (all det)']  # hourly vehicle counts [veh/h], index = integer hour of the day
     t_start = config.SIMULATION['EventStartTime']       # simulation start time [s since midnight]

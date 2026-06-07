@@ -43,8 +43,8 @@ class TVisitor:
             self.start_node_name = np.random.choice(list(start_node_prob.keys()), p=list(start_node_prob.values()))
             self.start_node = start_node_ids[self.start_node_name]
         else:
-            self.start_node_name = 'Bus_Start'
-            self.start_node = config.ROAD_NETWORK['Bus_Start']
+            self.start_node_name = 'Bus_start'
+            self.start_node = config.ROAD_NETWORK['Bus_start']
 
         # PDL attributes
         self.depart_time = env.now   # DepartTime = Now
