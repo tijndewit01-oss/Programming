@@ -28,8 +28,9 @@ class TVisitor:
         #Determine the mode of transport for the visitor based on the mode split in config
         mode_split = config.VISITOR_GENERATOR['ModeSplit']
         self.mode = np.random.choice(list(mode_split.keys()), p=list(mode_split.values()))
-        self.shuttlebus_walktime = config.VISITOR['Dist_WalkToShuttlebus'] / config.VISITOR['VisitorWalkSpeed']
-        self.ticket_walktime = config.VISITOR['Dist_WalkToTicketScan'] / config.VISITOR['VisitorWalkSpeed']
+        walk_speed = config.VISITOR['VisitorWalkSpeed']
+        self.shuttlebus_walktime = config.VISITOR['Dist_WalkToShuttlebus'] / walk_speed
+        self.ticket_walktime = config.VISITOR['Dist_WalkToTicketScan'] / walk_speed
 
 
         self.busqueue = busqueue

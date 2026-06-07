@@ -11,9 +11,10 @@ class TVisitorGenerator:
 
     def __init__(self, env, busqueue, carqueues, ticketqueue):
         #Get the randomized inter departure times for the visitors based on the gamma distribution parameters in config
-        inter_depart_params = gamma.rvs(a=config.VISITOR_GENERATOR['InterDepartDistributionParams']['kappa'],
-                                        scale=config.VISITOR_GENERATOR['InterDepartDistributionParams']['theta'],
-                                        loc=config.VISITOR_GENERATOR['InterDepartDistributionParams']['shift'],
+        gamma_params = config.VISITOR_GENERATOR['InterDepartDistributionParams']
+        inter_depart_params = gamma.rvs(a=gamma_params['kappa'],
+                                        scale=gamma_params['theta'],
+                                        loc=gamma_params['shift'],
                                         size=config.SIMULATION['NumberVisitors'])
         inter_depart_params.sort()  # Sort arrival times in ascending order (Returns a sorted numpy array))
         self.inter_depart_time = inter_depart_params[1:] - inter_depart_params[:-1]  # Calculate inter-departure times

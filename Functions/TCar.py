@@ -20,8 +20,9 @@ class TCar:
         self.departed_event = env.event()
         self.parking_lot_node = config.ROAD_NETWORK['Parkinglot']
         self.max_wait_time = config.CAR['MaxWaitTime']
-        carcap_low = config.CAR['CarCapacityDistribution']['low']
-        carcap_high = config.CAR['CarCapacityDistribution']['high']
+        carcap_dist = config.CAR['CarCapacityDistribution']
+        carcap_low = carcap_dist['low']
+        carcap_high = carcap_dist['high']
 
         #Initialize capacity resource
         self.passenger_capacity = np.random.randint(carcap_low, carcap_high+1) 
