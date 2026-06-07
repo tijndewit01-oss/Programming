@@ -20,12 +20,12 @@ class TTicketScan:
     scanner until a visitor is available.
     """
 
-    def __init__(self, env):
+    def __init__(self, env, ticketqueue):
         self.env = env
 
-        # Shared FIFO queue of visitors waiting to be scanned (PDL: MyQueue)
-        self.queue = simpy.Store(env)
-        self.ticketqueue = self.queue
+        # Shared FIFO queue of visitors waiting to be scanned (PDL: MyQueue).
+        # Created in main.py and injected so all shared queues live in one place.
+        self.queue = ticketqueue
 
         self.scan_time = config.TICKET_SCAN['ScanTimePerTicket']
 

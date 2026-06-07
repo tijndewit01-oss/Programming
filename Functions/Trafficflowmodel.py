@@ -204,6 +204,10 @@ def background_density_update(env, G, density_map):
         # next hour boundary) would fall at or after the end of the simulation
         if (next_hour * 3600 - interpolate/2) >= t_end:
             break
+        # Stop once we run past the last hour the flow data covers (indices 0..len-1),
+        # otherwise flow[next_hour] would index out of bounds.
+        if next_hour >= len(flow):
+            break
         # Sleep until interpolate/2 seconds before the next full hour so the interpolation
         # window is centred symmetrically on the hour boundary
         yield env.timeout(seconds_to_next_hour - int(interpolate/2))
