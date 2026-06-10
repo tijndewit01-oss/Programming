@@ -18,16 +18,88 @@ Phase 3: Traffic Flow Model
 X Implement Greenshields velocity function: u(ρ) = u_max * (1 - ρ/ρ_max)
 X Implement travel time computation per road segment given current density
 X Implement shared TrafficDensity counter structure for all segments
-N Update gridlock to crawling speed (near-jam workaround exists; proper crawl speed not yet set)
+X Update gridlock to crawling speed (fixed 2026-06-10; see BUG #2 notes)
 
 Phase 4: Core Simulation Components
-X Implement TVisitorGenerator: logic done; 
-X Implement TVisitor: logic done;
-W Implement TCarGenerator: logic done; manage_node pattern correct; interface/import may need adjustment after fixes
-X Implement TCar: logic done;
-W Implement TShuttleBus: logic done; bugs — self.G and self.density_map not passed into constructor
-W Implement TTicketScan: logic done; queue connections to TVisitor need wiring in main
-- Implement Initialization: wire all components together in main.py (env, graph, density_map, queues, all processes)
+X Implement TVisitorGenerator: absolute-clock/windowed arrival sampling implemented
+X Implement TVisitor: logic done; passivate/reactivate works
+X Implement TCarGenerator: logic done; manage_node pattern correct, passes carqueues
+X Implement TCar: dangling Store.get bug fixed; parking timing still a modelling gap
+X Implement TShuttleBus: self-jam and shared-path bugs fixed; capacity/scenario tuning remains
+X Implement TTicketScan: logic done; queue injected from main
+X Implement Initialization: main.py wires env, graph, density_map, all queues, parking lot,
+    background density, and all processes; runs end-to-end. Queues all created in main.py.
+    NOTE: contains init-time guards for DATA BUGS #8/#9 (see below) — those are workarounds,
+    not real fixes.
+
+==========================================================================
+KNOWN BUGS / CORRECTNESS ISSUES (found 2026-06-07 full audit; sim runs but results are WRONG)
+Severity:  !!! = corrupts results / silent data loss    !! = wrong under config changes    ! = modeling gap
+--------------------------------------------------------------------------
+FIXED 2026-06-10  BUG #1  TCar dangling Store.get  (Functions/TCar.py, board_visitors/run)
+    On MaxWaitTime timeout the boarding process is interrupted but its pending
+    carqueues[source].get() is NEVER cancelled. The dead get stays on the Store's
+    get_queue (FIFO, ahead of the live car) and steals the next visitor that arrives,
+    who is then never boarded or reactivated -> silently lost.
+    MEASURED: 222 / 3031 car visitors lost in a baseline run. Worse at sparse nodes
+    (each timed-out/empty car leaks another get).
+    FIX: cancel the get on interrupt (see the get.cancel() pattern in TShuttleBus._board),
+    or rewrite boarding with a single timeout race like the bus does.
+
+FIXED 2026-06-10  BUG #2  Traffic-model self-jam / crawl speed  (Functions/Trafficflowmodel.py greenshields_speed)
+    A vehicle adds its OWN pcu to an edge before computing its own travel time, and
+    near jam density greenshields gives ~0 speed (rho_clamped = rho_max*0.9999, the
+    "PLACEHOLDER fix crawling speed" line). The bus (bus_equivalent=3) alone exceeds
+    rho_max on 51/221 edges -> a 2 s segment becomes ~25000 s. One-way bus trip blows
+    up from ~210 s to ~7 h.
+    MEASURED: only 80 / 2068 shuttle visitors completed; ~1988 stuck.
+    (1 edge also self-jams a single car, rho_max < 1.)
+    FIX: set a real minimum crawl speed (e.g. 5 km/h floor) instead of ~0, and/or do
+    not count a vehicle's own pcu when computing its own edge travel time.
+
+FIXED 2026-06-10  BUG #3  Arrival clock offset + off-by-one  (Functions/TVisitorGenerator.py)
+    gamma.rvs returns ABSOLUTE arrival times (loc/shift ~66271 s = 18:24), but the code
+    diffs them and yields the gaps starting at env.now=0, discarding the offset.
+    RESULT: visitors arrive at sim-time 1..40104 s instead of in the 64800..86400 window.
+    EventStartTime is ignored and arrivals are misaligned with background_density_update
+    (which reads env.now as seconds-since-midnight). Also diff of N samples = N-1, so
+    5099 visitors spawn instead of 5100.
+    FIX: yield to each absolute time, e.g. wait (sample[i] - env.now); keep all N samples.
+
+FIXED 2026-06-10  BUG #4  TShuttleBus shared self.path  (Functions/TShuttleBus.py run)
+    self.path is an instance attribute shared by all n_buses processes; with n_buses>1
+    (an experimental factor, Phase 7) concurrent buses overwrite each other's path.
+    FIX: make path a local variable inside run().
+
+!   BUG #5  Parking timing not modelled  (Functions/TCar.py)
+    CAR['FindSpaceParkCar'] (600 s) and CAR['ParkingLotEntryDelay'] are never used; the
+    PDL parking-entry + find-space delays are missing. parking_lot slot is acquired but
+    never released (fine only because main uses a huge capacity placeholder).
+
+!   BUG #6  No output logging yet (Phase 5) — sim produces no per-visitor/car/bus/segment
+    data, so results can't be inspected/validated. Also means losses (BUG #1) are invisible.
+
+!!  BUG #7  Current baseline capacity does not clear all generated visitors by midnight.
+    After the 2026-06-10 correctness fixes an instrumented run generated all 5100 visitors,
+    but only 3031 completed by 86400 s with 694 still in the shuttle queue and 1326 still
+    in the ticket-scan queue. This is no longer caused by the shuttle self-jam bug; it means
+    the scenario parameters (notably NumScanLanes=2 and n_buses=1) or the run horizon need
+    to be calibrated before claiming baseline validity.
+
+--- DATA ISSUES (need the data/nodes fixed, currently worked around in main.py) ---
+!!! BUG #8  Node3 (3620826627) has no path to the parking lot in the directed graph.
+    main.prepare_start_nodes drops it with a warning (loses ~2.6% of car entry points).
+    FIX: correct the node id / graph so all entry points reach the parking lot.
+
+!!! BUG #9  CarStartNodeProb sums to ~0.79, not 1.0 (config.ROAD_NETWORK).
+    np.random.choice requires p to sum to 1; main.prepare_start_nodes renormalises as a
+    guard. FIX: correct the entry-point probability weights in config.
+
+--- minor / cleanup ---
+!   Stale docstrings claim queues are registered in config (TShuttleBus, TTicketScan);
+    queues are now injected from main. Unused imports: simpy in TTicketScan, random/simpy
+    in TCarGenerator, and the large commented-out old TCarGenerator block.
+==========================================================================
 
 Phase 5: Output Logging
 - Log per-visitor data: entry point, transport mode, depart time, arrival time, time per journey phase
@@ -83,9 +155,10 @@ Phase 11: Final Integration
 
 '''
 project/
-├── main.py                  ← Entry point; currently only loads RoadData.json.
-│                               Needs to: create SimPy env, load network.pkl,
-│                               instantiate all components, start the simulation.
+├── main.py                  ← Initialization / entry point. Creates SimPy env, loads
+│                               network.pkl, builds density_map, creates ALL shared queues
+│                               + parking lot, validates entry nodes (guards for BUG #8/#9),
+│                               starts background density + all components, runs, prints summary.
 │
 ├── config.py                ← All static parameters, organized by section.
 │                               Sections: SIMULATION, ROAD_NETWORK, TRAFFIC_MODEL,
@@ -161,15 +234,14 @@ The output structures:
 
 
 
-Bas: Clean up functions, fix queueus
-when done start on initialization
+Bas: DONE - cleaned up functions, moved all queues to main, built Initialization.
+     DONE 2026-06-10 - fixed BUG #1, BUG #2, BUG #3, BUG #4.
+     Next: Phase 5 logging, then capacity calibration/validation.
 
-
-Tijn: Fix imports of data/nodes
-when done, see whats next
+Tijn: Fix imports of data/nodes -> this is BUG #8 (Node3 no path to parking) and
+      BUG #9 (CarStartNodeProb sums to 0.79). main.py currently works around both.
 
 
 
 '''
-
 

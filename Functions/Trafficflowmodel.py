@@ -23,15 +23,15 @@ class TrafficDensityMap:
     """
 
     def __init__(self) -> None:
-        # Dynamic density added exclusively by vehicles in the discrete-event simulation [veh/m]
+        # Dynamic occupancy added by vehicles in the discrete-event simulation [vehicles on edge]
         self._density: Dict[EdgeKey, float] = {}
-        # Jam density: the maximum density at which the road becomes fully blocked [veh/m]
+        # Jam occupancy: the maximum number of vehicle equivalents on this edge
         self._rho_max: Dict[EdgeKey, float] = {}
         # Free-flow speed: the speed vehicles travel when the road is completely empty [m/s]
         self._u_max_ms: Dict[EdgeKey, float] = {}
         # Physical length of the road segment [m]
         self._length: Dict[EdgeKey, float] = {}
-        # Background density from real-world traffic data (vehicles not explicitly modelled in the simulation) [veh/m]
+        # Background occupancy from real-world traffic data [vehicles on edge]
         self._rho_background: Dict[EdgeKey, float] = {}
 
     def init_edge(self, u: int, v: int, rho_max: float, u_max_ms: float, length: float) -> None:
@@ -44,7 +44,7 @@ class TrafficDensityMap:
         self._rho_background[key] = 0.0
 
     def set_density(self, u: int, v: int, rho: float) -> None:
-        """Write the simulated vehicle density for edge (u,v), clamped to the physical range [0, rho_max].
+        """Write the simulated vehicle occupancy for edge (u,v), clamped to the physical range [0, rho_max].
 
         Clamping prevents negative densities (e.g. from floating-point rounding when
         the last car leaves) and densities above the jam density.
@@ -54,15 +54,17 @@ class TrafficDensityMap:
         self._density[key] = max(0.0, min(rho, rho_max))
 
     def set_rho_background(self, u, v, rho_background):
-        """Set the background traffic density for edge (u,v).
+        """Set the background traffic occupancy for edge (u,v).
 
         Background density represents real-world vehicles not tracked as individual agents
         in the simulation (e.g. regular commuter traffic derived from loop-detector counts).
         """
-        self._rho_background[(u,v)] = rho_background
+        key = (u, v)
+        rho_max = self._rho_max.get(key, float('inf'))
+        self._rho_background[key] = max(0.0, min(float(rho_background), rho_max))
 
     def get_density(self, u: int, v: int) -> float:
-        """Return the total density on edge (u,v) [veh/m]: simulated cars + background traffic.
+        """Return the total occupancy on edge (u,v): simulated vehicles + background traffic.
 
         Both contributions are combined here so that all downstream calculations
         (speed, travel time, routing) automatically account for real-world congestion.
@@ -82,7 +84,7 @@ class TrafficDensityMap:
         return self._length.get((u, v))
 
     def update_density(self, u: int, v: int, delta: float) -> None:
-        """Add delta to the simulated density on edge (u,v).
+        """Add delta to the simulated occupancy on edge (u,v).
 
         Pass a positive delta when a vehicle enters the segment,
         a negative delta when it leaves. The result is clamped via set_density.
@@ -91,16 +93,16 @@ class TrafficDensityMap:
 
 
 def greenshields_speed(rho: float, rho_max: float, u_max_ms: float) -> float:
-    """Greenshields linear speed-density model: u = u_max * (1 - rho / rho_max).
+    """Greenshields linear speed-occupancy model: u = u_max * (1 - rho / rho_max).
 
     Returns 0 when the segment is at jam density (rho >= rho_max).
     """
     if rho_max <= 0:
         return 0.0
     rho_clamped = min(max(rho, 0.0), rho_max)
-    if rho_clamped >= rho_max:
-        rho_clamped = rho_max*0.9999 # avoid returning 0 speed to prevent infinite travel times; treat as near-jam
-    return u_max_ms * (1.0 - rho_clamped / rho_max)#PLACEHOLDER fix the crawling speed later
+    model_speed = u_max_ms * (1.0 - rho_clamped / rho_max)
+    min_crawl_speed = config.TRAFFIC_MODEL['min_crawl_speed_kph'] / 3.6
+    return max(model_speed, min_crawl_speed)
 
 
 def travel_time(length: float, rho: float, rho_max: float, u_max_ms: float) -> float:
@@ -178,23 +180,26 @@ def background_density_update(env, G, density_map):
     t_start = config.SIMULATION['EventStartTime']       # simulation start time [s since midnight]
     t_end = config.SIMULATION['EventEndingTime']         # simulation end time [s since midnight]
 
+    def edge_background_counts(data):
+        """Convert hourly road flow [veh/h] into vehicles present on this edge."""
+        u_max_ms = data.get('u_max_ms', config.TRAFFIC_MODEL['speed_fallback'] / 3.6)
+        length_km = data.get('length', 0.0) / 1000.0
+        if u_max_ms <= 0 or length_km <= 0:
+            return flow * 0.0
+        return (flow / (u_max_ms * 3.6)) * length_km
+
     #Initial set of density
     # Before any SimPy events run, set each edge's background density to the value
     # corresponding to the starting hour so the simulation begins with realistic congestion
     for u, v, data in G.edges(data=True):
         ref = data.get('ref', None)            # road reference string (e.g. 'N35'); identifies whether this is an N-road
-        u_max_ms = data.get('u_max_ms', None)  # free-flow speed [m/s], used to convert flow [veh/h] to density
-
-        # density = flow [veh/h] / speed [km/h]; u_max_ms * 3.6 converts m/s to km/h
-        flow_dens_N = flow / (u_max_ms * 3.6)
-        # local-road background density is N-road density scaled by the N_local factor
-        flow_dens_local = convert_N_local* (flow / (u_max_ms * 3.6))
+        flow_count = edge_background_counts(data)
 
         # int(t_start / 3600) gives the integer hour index into the flow array
         if ref in ('N35', 'N348'):
-            rho_background_value = (flow_dens_N[int(t_start / 3600)])
+            rho_background_value = flow_count[int(t_start / 3600)]
         else:
-            rho_background_value = (flow_dens_local[int(t_start / 3600)])
+            rho_background_value = convert_N_local * flow_count[int(t_start / 3600)]
         density_map.set_rho_background(u, v, rho_background_value)
     while True:
         current_hour = int(env.now // 3600)    # integer hour index of the hour currently in progress
@@ -219,22 +224,21 @@ def background_density_update(env, G, density_map):
             t = step * 60
             for u, v, data in G.edges(data=True):
                 ref = data.get('ref', None)
-                u_max_ms = data.get('u_max_ms', None)
-
-                flow_dens_N = flow / (u_max_ms * 3.6)
-                flow_dens_local = convert_N_local* (flow / (u_max_ms * 3.6))
+                flow_count = edge_background_counts(data)
 
 
                 if ref in ('N35', 'N348'):
                     # Linear interpolation: at t=0 the value equals current_hour density;
                     # at t=interpolate it equals next_hour density
-                    rho_background_value = (flow_dens_N[current_hour] +
-                                                       (flow_dens_N[next_hour] - flow_dens_N[current_hour])
-                                                       * (t/interpolate))
+                    rho_background_value = (flow_count[current_hour] +
+                                            (flow_count[next_hour] - flow_count[current_hour])
+                                            * (t/interpolate))
                 else:
-                    rho_background_value = (flow_dens_local[current_hour] +
-                                                       (flow_dens_local[next_hour] - flow_dens_local[current_hour])
-                                                       * (t/interpolate))
+                    rho_background_value = convert_N_local * (
+                        flow_count[current_hour] +
+                        (flow_count[next_hour] - flow_count[current_hour])
+                        * (t/interpolate)
+                    )
                 density_map.set_rho_background(u, v, rho_background_value)
 
             yield env.timeout(60)  # advance the simulation clock by 60 s before computing the next interpolation step

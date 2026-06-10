@@ -88,10 +88,10 @@ class TShuttleBus:
 
             # --- drive to the festival (PLACEHOLDER for road-network routing) ---
 
-            self.path = shortest_path(self.G, self.source, self.destination, self.density_map)
-            for u, v in zip(self.path[:-1], self.path[1:]):
-                self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
+            path = shortest_path(self.G, self.source, self.destination, self.density_map)
+            for u, v in zip(path[:-1], path[1:]):
                 travel_time = edge_travel_time(u, v, self.density_map)
+                self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
                 yield self.env.timeout(travel_time)
                 self.density_map.update_density(u, v, -self.bus_equivalent) # Decrement density after traversing
 
@@ -103,9 +103,9 @@ class TShuttleBus:
                 visitor.reactivate()  # visitor walks on to the ticket scan
 
             # --- drive back to the station, empty (PLACEHOLDER) ---
-            self.path = shortest_path(self.G, self.destination, self.source, self.density_map)
-            for u, v in zip(self.path[:-1], self.path[1:]):
-                self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
+            path = shortest_path(self.G, self.destination, self.source, self.density_map)
+            for u, v in zip(path[:-1], path[1:]):
                 travel_time = edge_travel_time(u, v, self.density_map)
+                self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
                 yield self.env.timeout(travel_time)
                 self.density_map.update_density(u, v, -self.bus_equivalent) # Decrement density after traversing

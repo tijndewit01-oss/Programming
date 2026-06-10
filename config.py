@@ -61,6 +61,9 @@ TRAFFIC_MODEL: Dict[str, Any] = {
 	# free-flow speed (u_max) units consistent with distances/time
 	'speed_fallback': 30.0, #In case the osm had no speed limit, default to 30 kph (8.33 m/s)
 
+	# minimum speed used when an edge is at/above jam occupancy
+	'min_crawl_speed_kph': 5.0,
+
 	# average space one car occupies on the road (bumper-to-bumper, meters)
 	'Car_Spacing': 7.5,
 }
@@ -142,5 +145,4 @@ ALL_SECTIONS: Dict[str, Dict[str, Any]] = {
 	'VISITOR': VISITOR,
 	'VISITOR_GENERATOR': VISITOR_GENERATOR,
 }
-
 

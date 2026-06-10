@@ -90,7 +90,7 @@ def prepare_start_nodes(G, density_map):
 
 
 def main():
-    env = simpy.Environment()
+    env = simpy.Environment(initial_time=config.SIMULATION['EventStartTime'])
 
     # --- road network + shared traffic-density state ---
     G = load_graph()
