@@ -80,12 +80,13 @@ FIXED 2026-06-10  BUG #5  Parking timing not modelled  (Functions/TCar.py)
     Baseline parameters were also adjusted to a more plausible 3 parking-entry lanes,
     10 s entry service, and 180 s find-space time.
 
-W   BUG #6  Output logging foundation exists, but detailed metrics are not complete yet.
-    FIXED SO FAR: SimulationLogger creates run_id, entity IDs, appendable CSV logs, and
-    scenario_summary.jsonl. Current files: visitor_log.csv, arrival_funnel_log.csv,
-    car_log.csv, bus_log.csv, segment_density_log.csv, scenario_summary.jsonl.
-    REMAINING: richer phase-duration fields, explicit queue_log.csv, periodic snapshots,
-    CO2/distance summaries, and validation/dashboard-ready aggregates.
+FIXED 2026-06-10  BUG #6  Output logging implemented for analysis/replay/dashboard inputs.
+    SimulationLogger creates run_id, entity IDs, appendable CSV logs, schema migration,
+    and scenario_summary.jsonl. Current files: visitor_log.csv, arrival_funnel_log.csv,
+    car_log.csv, bus_log.csv, segment_density_log.csv, queue_log.csv,
+    scenario_summary.jsonl. Includes phase-duration fields, queue events/snapshots,
+    road segment events/snapshots, distance totals, CO2 totals, peak queues, travel-time
+    percentiles, and mode counts.
 
 FIXED FOR BASELINE 2026-06-10  BUG #7  Current baseline capacity does not clear all generated visitors by midnight.
     After the 2026-06-10 correctness fixes an instrumented run generated all 5100 visitors,
@@ -126,10 +127,10 @@ X Log per-car foundation: car_id, source node, capacity, passenger count, depart
 X Log per-bus foundation: bus_id, trip_id, depart/arrival/return timestamps, passenger count, load factor
 X Log per-segment foundation: enter/exit events for cars and buses with occupancy, rho_max, and length
 X Save foundation logs to OUTPUT Data Files/logs at end of simulation run
-- Add explicit queue_log.csv for car, shuttle, ticket, and parking-entry queue length changes
-- Add time-per-phase fields to visitor_log.csv (car wait, bus wait, ticket wait, walking, in vehicle)
-- Add periodic road/queue snapshots for replay and dashboard time sliders
-- Add CO2/distance summaries and dashboard-ready scenario aggregates
+X Add explicit queue_log.csv for car, shuttle, ticket, parking-entry, and parking-lot occupancy changes/snapshots
+X Add time-per-phase fields to visitor_log.csv (car wait, bus wait, ticket wait, walking, in vehicle, parking, scanning)
+X Add periodic road/queue snapshots for replay and dashboard time sliders
+X Add CO2/distance summaries and dashboard-ready scenario aggregates
 
 Phase 6: Validation
 - Run simulation with observed parameters (real mode split, real arrival distribution)
@@ -266,7 +267,8 @@ Bas: DONE - cleaned up functions, moved all queues to main, built Initialization
      DONE 2026-06-10 - fixed BUG #1, BUG #2, BUG #3, BUG #4, BUG #5.
      DONE 2026-06-10 - retuned baseline capacity for BUG #7 (2 buses, 8 scan lanes).
      DONE 2026-06-10 - Phase 5 logging foundation (run/entity IDs, CSV/JSONL files).
-     Next: detailed queue/phase metrics, then validation of the retuned capacities.
+     DONE 2026-06-10 - detailed queue/phase metrics, snapshots, CO2/distance summaries.
+     Next: build the interactive replay/dashboard, then validate the retuned capacities.
 
 Tijn: Fix imports of data/nodes -> BUG #8 remains (Node3 no path to parking).
       BUG #9 is fixed in config by normalising the reachable-node probabilities.

@@ -89,12 +89,19 @@ class TVisitor:
             yield self.env.timeout(self.shuttlebus_walktime)
             self.set_state('waiting_bus', 'bus_stop')
             self.busqueue.put(self)   # EnterQueue
+            self._log_queue('shuttle_bus_queue', 'bus_stop', len(self.busqueue.items), 'enqueue')
             yield self._wake                                  # Passivate; bus reactivates
             self._wake = self.env.event()
         else:
             # Car: join the carpool queue and wait until the car has parked
             self.set_state('waiting_car', self.start_node_name)
             self.carqueues[self.start_node].put(self)         # EnterQueue
+            self._log_queue(
+                f"car_queue_{self.start_node}",
+                self.start_node_name,
+                len(self.carqueues[self.start_node].items),
+                'enqueue',
+            )
             yield self._wake                                  # Passivate; car reactivates
             self._wake = self.env.event()
 
@@ -103,6 +110,7 @@ class TVisitor:
         yield self.env.timeout(self.ticket_walktime)
         self.set_state('waiting_ticket', 'ticket_scan')
         self.ticketqueue.put(self)          # EnterQueue
+        self._log_queue('ticket_scan_queue', 'ticket_scan', len(self.ticketqueue.items), 'enqueue')
         yield self._wake                                      # Passivate; scanner reactivates
 
         # ArrivalTime = Now (visitor has passed the festival entrance)
@@ -110,3 +118,16 @@ class TVisitor:
         self.set_state('scanned', 'ticket_scan')
         if self.logger:
             self.logger.complete_visitor(self.visitor_id, self.arrival_time)
+
+    def _log_queue(self, queue_name, location, length, event_type):
+        if not self.logger:
+            return
+        self.logger.log_queue(
+            sim_time=self.env.now,
+            queue_name=queue_name,
+            location=location,
+            length=length,
+            event_type=event_type,
+            actor_type='visitor',
+            actor_id=self.visitor_id,
+        )

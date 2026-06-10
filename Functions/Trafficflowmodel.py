@@ -71,6 +71,14 @@ class TrafficDensityMap:
         """
         return self._density.get((u, v), 0.0) + self._rho_background.get((u,v), 0.0)
 
+    def get_simulated_density(self, u: int, v: int) -> float:
+        """Return simulated vehicle occupancy on edge (u,v), excluding background traffic."""
+        return self._density.get((u, v), 0.0)
+
+    def get_background_density(self, u: int, v: int) -> float:
+        """Return background traffic occupancy on edge (u,v)."""
+        return self._rho_background.get((u, v), 0.0)
+
     def get_rho_max(self, u: int, v: int) -> float:
         """Return the jam density [veh/m] for edge (u,v) — the density at which flow stops."""
         return self._rho_max.get((u, v))
@@ -123,6 +131,31 @@ def edge_travel_time(u: int, v: int, density_map: TrafficDensityMap) -> float:
     u_max_ms = density_map.get_u_max_ms(u, v)
     length = density_map.get_length(u, v)
     return travel_time(length, rho, rho_max, u_max_ms)
+
+
+def edge_state(u: int, v: int, density_map: TrafficDensityMap) -> dict:
+    """Return dashboard/log-friendly state for one edge at the current density."""
+    occupancy = density_map.get_density(u, v)
+    background_occupancy = density_map.get_background_density(u, v)
+    rho_max = density_map.get_rho_max(u, v)
+    length_m = density_map.get_length(u, v)
+    travel_time_s = edge_travel_time(u, v, density_map)
+    if travel_time_s and travel_time_s != float('inf'):
+        speed_ms = length_m / travel_time_s
+    else:
+        speed_ms = 0.0
+    if rho_max and rho_max != float('inf'):
+        congestion_ratio = occupancy / rho_max
+    else:
+        congestion_ratio = 0.0
+    return {
+        'occupancy': occupancy,
+        'background_occupancy': background_occupancy,
+        'rho_max': rho_max,
+        'congestion_ratio': congestion_ratio,
+        'speed_ms': speed_ms,
+        'length_m': length_m,
+    }
 
 
 def init_from_graph(G: nx.MultiDiGraph, density_map: "TrafficDensityMap | None" = None) -> TrafficDensityMap:

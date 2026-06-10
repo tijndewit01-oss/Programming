@@ -38,5 +38,15 @@ class TTicketScan:
             # Wait (Standby) until a visitor is queued, then take the first one
             visitor = yield self.queue.get()        # FirstOfQueue + LeaveQueue
             visitor.set_state('scanning', 'ticket_scan')
+            if self.logger:
+                self.logger.log_queue(
+                    sim_time=self.env.now,
+                    queue_name='ticket_scan_queue',
+                    location='ticket_scan',
+                    length=len(self.queue.items),
+                    event_type='dequeue',
+                    actor_type='visitor',
+                    actor_id=visitor.visitor_id,
+                )
             yield self.env.timeout(self.scan_time)   # Wait ScanTicket
             visitor.reactivate()                     # visitor leaves the system

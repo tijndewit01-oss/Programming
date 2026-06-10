@@ -26,6 +26,7 @@ from Functions.Trafficflowmodel import (
     init_from_graph,
     shortest_path,
     background_density_update,
+    edge_state,
 )
 from Functions.TTicketScan import TTicketScan
 from Functions.TShuttleBus import TShuttleBus
@@ -90,6 +91,77 @@ def prepare_start_nodes(G, density_map):
     return reachable
 
 
+def queue_snapshot_update(env, logger, busqueue, ticketqueue, carqueues, parking_entry, parking_lot):
+    """Periodically sample queue lengths for replay/dashboard time sliders."""
+    interval = config.LOGGING['QueueSampleInterval']
+    while True:
+        logger.log_queue(
+            sim_time=env.now,
+            queue_name='shuttle_bus_queue',
+            location='bus_stop',
+            length=len(busqueue.items),
+            event_type='snapshot',
+            actor_type='system',
+            actor_id='',
+        )
+        logger.log_queue(
+            sim_time=env.now,
+            queue_name='ticket_scan_queue',
+            location='ticket_scan',
+            length=len(ticketqueue.items),
+            event_type='snapshot',
+            actor_type='system',
+            actor_id='',
+        )
+        for node_id, queue in carqueues.items():
+            logger.log_queue(
+                sim_time=env.now,
+                queue_name=f"car_queue_{node_id}",
+                location=node_id,
+                length=len(queue.items),
+                event_type='snapshot',
+                actor_type='system',
+                actor_id='',
+            )
+        logger.log_queue(
+            sim_time=env.now,
+            queue_name='parking_entry_queue',
+            location='parking_lot',
+            length=len(parking_entry.queue),
+            event_type='snapshot',
+            actor_type='system',
+            actor_id='',
+        )
+        logger.log_queue(
+            sim_time=env.now,
+            queue_name='parking_lot_occupancy',
+            location='parking_lot',
+            length=parking_lot.count,
+            event_type='snapshot',
+            actor_type='system',
+            actor_id='',
+        )
+        yield env.timeout(interval)
+
+
+def segment_snapshot_update(env, G, density_map, logger):
+    """Periodically sample every road segment for map/replay reconstruction."""
+    interval = config.LOGGING['SegmentSampleInterval']
+    while True:
+        for u, v, _data in G.edges(data=True):
+            logger.log_segment_density(
+                sim_time=env.now,
+                event_type='snapshot',
+                actor_type='system',
+                actor_id='',
+                u=u,
+                v=v,
+                segment_id=f"{u}->{v}",
+                **edge_state(u, v, density_map),
+            )
+        yield env.timeout(interval)
+
+
 def main():
     env = simpy.Environment(initial_time=config.SIMULATION['EventStartTime'])
     logger = SimulationLogger(
@@ -117,6 +189,19 @@ def main():
     if ENABLE_BACKGROUND_DENSITY:
         env.process(background_density_update(env, G, density_map))
 
+    if config.LOGGING['QueueSampleInterval'] > 0:
+        env.process(queue_snapshot_update(
+            env,
+            logger,
+            busqueue,
+            ticketqueue,
+            carqueues,
+            parking_entry,
+            parking_lot,
+        ))
+    if config.LOGGING['SegmentSampleInterval'] > 0:
+        env.process(segment_snapshot_update(env, G, density_map, logger))
+
     # --- components (PDL Initialization order) ---
     ticket_scan = TTicketScan(env, ticketqueue, logger)
     shuttle_bus = TShuttleBus(env, G, density_map, busqueue, logger)
@@ -128,7 +213,8 @@ def main():
 
     # --- summary (per-visitor logging is Phase 5) ---
     waiting_for_car = sum(len(q.items) for q in carqueues.values())
-    logger.log_scenario_summary({
+    logger.set_final_time(env.now)
+    scenario_summary = {
         'finished_at': env.now,
         'event_start_time': config.SIMULATION['EventStartTime'],
         'event_ending_time': config.SIMULATION['EventEndingTime'],
@@ -143,8 +229,10 @@ def main():
         'n_buses': config.SHUTTLE_BUS['n_buses'],
         'ticket_scan_lanes': config.TICKET_SCAN['NumScanLanes'],
         'parking_entry_lanes': config.CAR['ParkingLotEntryLanes'],
-    })
-    logger.flush()
+    }
+    scenario_summary.update(logger.summary_metrics(config.EMISSIONS))
+    logger.log_scenario_summary(scenario_summary)
+    logger.flush(final_time=env.now)
 
     print(f"\nSimulation finished at t = {env.now} s")
     print(f"Run ID:                      {logger.run_id}")

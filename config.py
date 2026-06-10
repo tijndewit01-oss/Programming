@@ -43,6 +43,16 @@ SIMULATION: Dict[str, Any] = {
 LOGGING: Dict[str, Any] = {
     'OutputDir': 'OUTPUT Data Files/logs',
     'RunId': None,
+    'QueueSampleInterval': 60,
+    'SegmentSampleInterval': 300,
+}
+
+
+# --- EMISSIONS ---
+EMISSIONS: Dict[str, Any] = {
+    # PLACEHOLDER factors for scenario comparison; replace with cited final-report values.
+    'CarKgCO2PerKm': 0.171,
+    'BusKgCO2PerKm': 0.822,
 }
 
 
@@ -152,6 +162,7 @@ ALL_SECTIONS: Dict[str, Dict[str, Any]] = {
 	'ROAD_NETWORK': ROAD_NETWORK,
 	'TRAFFIC_MODEL': TRAFFIC_MODEL,
     'LOGGING': LOGGING,
+    'EMISSIONS': EMISSIONS,
 	'CAR': CAR,
 	'CAR_GENERATOR': CAR_GENERATOR,
 	'SHUTTLE_BUS': SHUTTLE_BUS,

@@ -1,5 +1,5 @@
 #The TShuttleBus class (PDL: TShuttleBus)
-from Functions.Trafficflowmodel import shortest_path, edge_travel_time
+from Functions.Trafficflowmodel import shortest_path, edge_travel_time, edge_state
 import config
 
 class TShuttleBus:
@@ -57,6 +57,7 @@ class TShuttleBus:
             if len(self.busqueue.items) > 0:
                 visitor = yield self.busqueue.get()       # FirstOfQueue + LeaveQueue
                 visitor.set_state('in_bus', 'bus')
+                self._log_queue(len(self.busqueue.items), 'dequeue', visitor.visitor_id)
                 yield self.env.timeout(self.boarding_time)
                 passengers.append(visitor)
                 continue
@@ -67,6 +68,7 @@ class TShuttleBus:
             result = yield get | self.env.timeout(remaining)
             if get in result:
                 result[get].set_state('in_bus', 'bus')
+                self._log_queue(len(self.busqueue.items), 'dequeue', result[get].visitor_id)
                 yield self.env.timeout(self.boarding_time)
                 passengers.append(result[get])
             else:
@@ -91,6 +93,7 @@ class TShuttleBus:
             trip_id += 1
             depart_time = self.env.now
             path = shortest_path(self.G, self.source, self.destination, self.density_map)
+            outbound_distance_m = self._path_length(path)
             for u, v in zip(path[:-1], path[1:]):
                 travel_time = edge_travel_time(u, v, self.density_map)
                 self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
@@ -108,7 +111,9 @@ class TShuttleBus:
                 visitor.reactivate()  # visitor walks on to the ticket scan
 
             # --- drive back to the station, empty (PLACEHOLDER) ---
+            return_depart_time = self.env.now
             path = shortest_path(self.G, self.destination, self.source, self.density_map)
+            return_distance_m = self._path_length(path)
             for u, v in zip(path[:-1], path[1:]):
                 travel_time = edge_travel_time(u, v, self.density_map)
                 self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
@@ -129,11 +134,35 @@ class TShuttleBus:
                     capacity=self.capacity,
                     load_factor=len(passengers) / self.capacity,
                     station_queue_left=len(self.busqueue.items),
+                    outbound_drive_time=arrival_time - depart_time,
+                    return_drive_time=return_arrival_time - return_depart_time,
+                    outbound_distance_m=outbound_distance_m,
+                    return_distance_m=return_distance_m,
                 )
+
+    def _log_queue(self, length, event_type, visitor_id):
+        if not self.logger:
+            return
+        self.logger.log_queue(
+            sim_time=self.env.now,
+            queue_name='shuttle_bus_queue',
+            location='bus_stop',
+            length=length,
+            event_type=event_type,
+            actor_type='visitor',
+            actor_id=visitor_id,
+        )
+
+    def _path_length(self, path):
+        return sum(
+            self.density_map.get_length(u, v) or 0
+            for u, v in zip(path[:-1], path[1:])
+        )
 
     def _log_segment(self, event_type, bus_id, u, v):
         if not self.logger:
             return
+        state = edge_state(u, v, self.density_map)
         self.logger.log_segment_density(
             sim_time=self.env.now,
             event_type=event_type,
@@ -142,7 +171,5 @@ class TShuttleBus:
             u=u,
             v=v,
             segment_id=f"{u}->{v}",
-            occupancy=self.density_map.get_density(u, v),
-            rho_max=self.density_map.get_rho_max(u, v),
-            length_m=self.density_map.get_length(u, v),
+            **state,
         )
