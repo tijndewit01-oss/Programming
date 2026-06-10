@@ -153,6 +153,8 @@ Phase 8: Visualisation: Road Map
 X Build Plotly-based road replay from segment_density_log.csv snapshots
 X Add animated road congestion colour scale green/yellow/orange/red
 X Add moving shuttle-bus markers from logged bus segment events
+X Add static map markers for car entry nodes, train station/shuttle stop, and merged
+    car parking & festival entrance locations
 X Export replay as self-contained OUTPUT Data Files/simulation_replay.html
 - Export segment density time series to GeoJSON format if a Folium deliverable is still required
 - Add hover tooltips per segment (density, speed, car count)

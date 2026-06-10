@@ -1,2 +1,5 @@
 .vscode/settings.json
 *.pyc
+*.csv
+*.jsonl
+*.html

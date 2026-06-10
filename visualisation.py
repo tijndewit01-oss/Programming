@@ -76,6 +76,13 @@ STATE_COLORS = [
 
 BUS_COLORS = ['#111827', '#0f766e', '#7c2d12', '#581c87', '#1e40af']
 
+LOCATION_STYLES = {
+    'car_entry': {'color': '#8b5cf6', 'symbol': 'circle', 'size': 9},
+    'train_station': {'color': '#0ea5e9', 'symbol': 'diamond', 'size': 13},
+    'festival': {'color': '#dc2626', 'symbol': 'star', 'size': 15},
+    'merged': {'color': '#be123c', 'symbol': 'star-diamond', 'size': 16},
+}
+
 
 def load_latest_run_id(log_dir: str = LOG_DIR) -> str:
     """Return the most recent run_id, preferring scenario_summary.jsonl."""
@@ -243,6 +250,81 @@ def build_static_network_payload(edge_lookup: dict[str, dict[str, Any]]) -> dict
         x_values.append(None)
         y_values.append(None)
     return {'x': x_values, 'y': y_values}
+
+
+def build_location_marker_groups(node_lookup: dict[int, tuple[float, float]]) -> list[dict[str, Any]]:
+    """Build map markers for static event locations, merged per physical node."""
+
+    poi_rows: list[dict[str, Any]] = []
+    for start_name, node_id in config.ROAD_NETWORK['StartNodes'].items():
+        poi_rows.append({
+            'node_id': int(node_id),
+            'label': f'Car entry {start_name}',
+            'legend_group': 'Car entry nodes',
+            'style': 'car_entry',
+        })
+
+    poi_rows.extend([
+        {
+            'node_id': int(config.ROAD_NETWORK['Bus_start']),
+            'label': 'Train station / shuttle stop',
+            'legend_group': 'Train station / shuttle stop',
+            'style': 'train_station',
+        },
+        {
+            'node_id': int(config.ROAD_NETWORK['Parkinglot']),
+            'label': 'Car parking',
+            'legend_group': 'Car parking',
+            'style': 'festival',
+        },
+        {
+            # No separate festival-entrance node exists in config yet; current
+            # visitor logic treats the parking/ticket-scan area as the merge point.
+            'node_id': int(config.ROAD_NETWORK['Parkinglot']),
+            'label': 'Festival entrance',
+            'legend_group': 'Festival entrance',
+            'style': 'festival',
+        },
+    ])
+
+    by_node: dict[int, list[dict[str, Any]]] = {}
+    for row in poi_rows:
+        if row['node_id'] not in node_lookup:
+            continue
+        by_node.setdefault(row['node_id'], []).append(row)
+
+    marker_groups: dict[str, dict[str, Any]] = {}
+    for node_id, rows in by_node.items():
+        x, y = node_lookup[node_id]
+        labels = [row['label'] for row in rows]
+        styles = {row['style'] for row in rows}
+        is_merged = len(rows) > 1 and len({row['legend_group'] for row in rows}) > 1
+        style_key = 'merged' if is_merged else rows[0]['style']
+        style = LOCATION_STYLES[style_key]
+        legend_name = ' & '.join(labels) if is_merged else rows[0]['legend_group']
+
+        group = marker_groups.setdefault(legend_name, {
+            'name': legend_name,
+            'x': [],
+            'y': [],
+            'text': [],
+            'hovertext': [],
+            'style': style,
+        })
+        group['x'].append(x)
+        group['y'].append(y)
+        group['text'].append(' & '.join(labels) if is_merged else rows[0]['label'])
+        group['hovertext'].append(
+            f"{' & '.join(labels)}<br>Node {node_id}<br>lon {x:.6f}, lat {y:.6f}"
+        )
+
+    return sorted(
+        marker_groups.values(),
+        key=lambda group: (
+            0 if group['name'] == 'Car entry nodes' else 1,
+            group['name'],
+        ),
+    )
 
 
 def build_road_snapshots(segment_log: pd.DataFrame, edge_lookup: dict[str, dict[str, Any]]) -> dict[float, list[dict[str, list[float | None]]]]:
@@ -564,6 +646,7 @@ def build_simulation_replay(
     bus_intervals = build_bus_intervals(logs['segments'])
     bus_trips = build_bus_trips(logs['buses'])
     bus_series = build_bus_position_series(frame_times, bus_intervals, bus_trips, edge_lookup, node_lookup)
+    location_marker_groups = build_location_marker_groups(node_lookup)
 
     fig = create_replay_figure(
         run_id=selected_run_id,
@@ -576,6 +659,7 @@ def build_simulation_replay(
         queue_series=queue_series,
         visitor_state_series=visitor_state_series,
         bus_series=bus_series,
+        location_marker_groups=location_marker_groups,
     )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -594,6 +678,7 @@ def create_replay_figure(
     queue_series: dict[float, dict[str, float]],
     visitor_state_series: dict[float, dict[str, int]],
     bus_series: dict[float, dict[str, list[Any]]],
+    location_marker_groups: list[dict[str, Any]],
 ) -> go.Figure:
     fig = make_subplots(
         rows=2,
@@ -699,6 +784,8 @@ def create_replay_figure(
         col=2,
     )
 
+    add_location_markers(fig, location_marker_groups)
+
     fig.frames = build_frames(
         run_id=run_id,
         summary=summary,
@@ -712,6 +799,32 @@ def create_replay_figure(
 
     configure_layout(fig, run_id, summary, bounds, frame_times, queue_series, visitor_state_series)
     return fig
+
+
+def add_location_markers(fig: go.Figure, location_marker_groups: list[dict[str, Any]]) -> None:
+    for group in location_marker_groups:
+        style = group['style']
+        fig.add_trace(
+            go.Scatter(
+                x=group['x'],
+                y=group['y'],
+                mode='markers+text',
+                name=group['name'],
+                text=group['text'],
+                textposition='bottom center',
+                hovertext=group['hovertext'],
+                hovertemplate='%{hovertext}<extra></extra>',
+                marker={
+                    'color': style['color'],
+                    'symbol': style['symbol'],
+                    'size': style['size'],
+                    'line': {'color': '#ffffff', 'width': 1.5},
+                },
+                showlegend=True,
+            ),
+            row=1,
+            col=1,
+        )
 
 
 def build_frames(
