@@ -7,12 +7,13 @@ import config
 
 class TCar:
 
-    def __init__(self, env, G, source, density_map, parking_lot,carqueues):
+    def __init__(self, env, G, source, density_map, parking_lot, parking_entry, carqueues):
         self.env = env
         self.G = G
         self.source = source
         self.density_map = density_map
         self.parking_lot = parking_lot
+        self.parking_entry = parking_entry
         self.carqueues = carqueues
         self.passengers = []
         self.departed_event = env.event()
@@ -61,7 +62,13 @@ class TCar:
             yield self.env.timeout(travel_time)
             self.density_map.update_density(u, v, -1) # Decrement density after traversing
 
-        yield self.parking_lot.request()
+        with self.parking_entry.request() as entry_request:
+            yield entry_request
+            yield self.env.timeout(config.CAR['ParkingLotEntryDelay']())
+
+        self.parking_lot_request = self.parking_lot.request()
+        yield self.parking_lot_request
+        yield self.env.timeout(config.CAR['FindSpaceParkCar'])
 
         for visitor in self.passengers:
             visitor.reactivate()

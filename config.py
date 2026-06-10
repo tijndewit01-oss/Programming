@@ -71,11 +71,12 @@ TRAFFIC_MODEL: Dict[str, Any] = {
 
 # --- CAR ---
 CAR: Dict[str, Any] = {
-	# time (seconds) per parked car to find a space
-	'FindSpaceParkCar': 600, # s, 
+	# time (seconds) to find a parking space after passing the parking entrance
+	'FindSpaceParkCar': 180,
 
-	# parking-lot entry delay distribution placeholder; call to sample
-	'ParkingLotEntryDelay': lambda: 1.0, #PLACEHOLDER
+	# number of parallel parking entrance lanes and service time per car
+	'ParkingLotEntryLanes': 3,
+	'ParkingLotEntryDelay': lambda: 10.0,
 
 	# maximum wait time (seconds) a car will tolerate (e.g., at entry)
 	'MaxWaitTime': 180, # s, PLACEHOLDER
@@ -94,8 +95,8 @@ CAR_GENERATOR: Dict[str, Any] = {
 
 # --- SHUTTLE_BUS ---
 SHUTTLE_BUS: Dict[str, Any] = {
-	'n_buses': 1,
-	'capacity': 40, #PLACEHOLDER, check literature for typical shuttle bus capacities
+	'n_buses': 2,
+	'capacity': 40, # typical full-size shuttle bus capacity
 	'MaxWaitTime': 600,  # Seconds
 	'BoardingTimePerPassenger': 2, # Seconds
 	'AlightingTimePerPassenger': 2, # Seconds
@@ -107,7 +108,7 @@ SHUTTLE_BUS: Dict[str, Any] = {
 # --- TICKET_SCAN ---
 TICKET_SCAN: Dict[str, Any] = {
 	'ScanTimePerTicket': 3 + 10,  # seconds per ticket + Bag search
-	'NumScanLanes': 2, #PLACEHOLDER,
+	'NumScanLanes': 8,
 }
 
 
@@ -145,4 +146,3 @@ ALL_SECTIONS: Dict[str, Dict[str, Any]] = {
 	'VISITOR': VISITOR,
 	'VISITOR_GENERATOR': VISITOR_GENERATOR,
 }
-

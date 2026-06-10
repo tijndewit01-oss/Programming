@@ -1,6 +1,4 @@
 #The TCarGenerator class (PDL: TCarGenerator)
-import random
-import simpy
 import config
 from Functions.TCar import TCar
 
@@ -56,11 +54,12 @@ class TCarGenerator:
     #         yield self.env.timeout(0)  # yield control so the car process can start
 
 
-    def __init__(self, env, G, density_map, parking_lot, carqueues):
+    def __init__(self, env, G, density_map, parking_lot, parking_entry, carqueues):
         self.env = env
         self.G = G
         self.density_map = density_map
         self.parking_lot = parking_lot
+        self.parking_entry = parking_entry
         self.carqueues = carqueues
         self.start_nodes = config.ROAD_NETWORK['StartNodes']
 
@@ -77,6 +76,14 @@ class TCarGenerator:
 
     def manage_node(self, node):
         while True:
-            car = TCar(self.env, self.G, node, self.density_map, self.parking_lot, self.carqueues)
+            car = TCar(
+                self.env,
+                self.G,
+                node,
+                self.density_map,
+                self.parking_lot,
+                self.parking_entry,
+                self.carqueues,
+            )
             yield car.departed_event
             

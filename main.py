@@ -104,7 +104,8 @@ def main():
     ticketqueue = simpy.Store(env)
     carqueues = {node_id: simpy.Store(env) for node_id in start_nodes.values()}
 
-    # --- parking lot: cars hold a slot once parked (never released for now) ---
+    # --- parking lot: cars queue at the entrance, then hold a slot once parked ---
+    parking_entry = simpy.Resource(env, capacity=config.CAR['ParkingLotEntryLanes'])
     parking_lot = simpy.Resource(env, capacity=PARKING_CAPACITY)
 
     # --- real-world background traffic density (optional) ---
@@ -114,7 +115,7 @@ def main():
     # --- components (PDL Initialization order) ---
     ticket_scan = TTicketScan(env, ticketqueue)
     shuttle_bus = TShuttleBus(env, G, density_map, busqueue)
-    car_generator = TCarGenerator(env, G, density_map, parking_lot, carqueues)
+    car_generator = TCarGenerator(env, G, density_map, parking_lot, parking_entry, carqueues)
     visitor_generator = TVisitorGenerator(env, busqueue, carqueues, ticketqueue)
 
     # --- run ---
