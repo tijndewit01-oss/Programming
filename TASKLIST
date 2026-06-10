@@ -150,10 +150,12 @@ Phase 7: Scenario Parameters
 - Implement parking lot capacity cap with spillover behaviour
 
 Phase 8: Visualisation: Road Map
-- Export segment density time series to GeoJSON format
-- Build animated Folium map with TimestampedGeoJson, colour scale green to red
+X Build Plotly-based road replay from segment_density_log.csv snapshots
+X Add animated road congestion colour scale green/yellow/orange/red
+X Add moving shuttle-bus markers from logged bus segment events
+X Export replay as self-contained OUTPUT Data Files/simulation_replay.html
+- Export segment density time series to GeoJSON format if a Folium deliverable is still required
 - Add hover tooltips per segment (density, speed, car count)
-- Export as self-contained .html file
 
 Phase 9: Visualisation: Static Figures
 - Build travel time histogram with mean line and percentile band
@@ -166,6 +168,8 @@ Phase 9: Visualisation: Static Figures
 - Set up batch export of all figures to PNG
 
 Phase 10: Interactive Visualisation
+X Build interactive simulation replay with time slider, roads, shuttle buses,
+    queues/parking occupancy, and visitor journey-state panels
 - Build Plotly Sankey diagram of visitor flow through journey phases
 - Build scenario comparison dashboard (two simulation outputs side by side)
 - Export dashboard as standalone .html
@@ -191,8 +195,9 @@ project/
 │                               CAR, CAR_GENERATOR, SHUTTLE_BUS, TICKET_SCAN,
 │                               VISITOR, VISITOR_GENERATOR. No runtime objects.
 │
-├── visualisation.py         ← Empty. Will read output CSVs/JSONs and
-│                               produce all figures and maps.
+├── visualisation.py         ← Reads output CSVs/JSONs and produces the Prompt 3
+│                               Plotly simulation replay HTML. Later dashboard/static
+│                               figures still need to be added here.
 │
 ├── functions/
 │   ├── TrafficFlowModel.py  ← Core traffic model. Contains:
