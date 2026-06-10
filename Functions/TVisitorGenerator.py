@@ -10,7 +10,7 @@ from Functions.TVisitor import TVisitor
 class TVisitorGenerator:
 
 
-    def __init__(self, env, busqueue, carqueues, ticketqueue):
+    def __init__(self, env, busqueue, carqueues, ticketqueue, logger=None):
         # Get randomized absolute departure times based on the fitted gamma distribution.
         gamma_params = config.VISITOR_GENERATOR['InterDepartDistributionParams']
         departure_times = self._sample_departure_times(gamma_params)
@@ -22,6 +22,7 @@ class TVisitorGenerator:
         self.busqueue = busqueue
         self.carqueues = carqueues
         self.ticketqueue = ticketqueue
+        self.logger = logger
 
 
         self.process = env.process(self.run())
@@ -52,4 +53,12 @@ class TVisitorGenerator:
             wait_time = max(0.0, departure_time - self.env.now)
             yield self.env.timeout(wait_time)
             #Generate a visitor
-            TVisitor(self.env, self.busqueue, self.carqueues, self.ticketqueue)
+            visitor_id = self.logger.next_id('visitor') if self.logger else None
+            TVisitor(
+                self.env,
+                self.busqueue,
+                self.carqueues,
+                self.ticketqueue,
+                visitor_id=visitor_id,
+                logger=self.logger,
+            )

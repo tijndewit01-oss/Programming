@@ -14,13 +14,14 @@ class TCarGenerator:
     waking the generator so it can spawn the next car.
     """
 
-    def __init__(self, env, G, density_map, parking_lot, parking_entry, carqueues):
+    def __init__(self, env, G, density_map, parking_lot, parking_entry, carqueues, logger=None):
         self.env = env
         self.G = G
         self.density_map = density_map
         self.parking_lot = parking_lot
         self.parking_entry = parking_entry
         self.carqueues = carqueues
+        self.logger = logger
         self.start_nodes = config.ROAD_NETWORK['StartNodes']
 
         self.process = env.process(self.run())
@@ -36,6 +37,7 @@ class TCarGenerator:
 
     def manage_node(self, node):
         while True:
+            car_id = self.logger.next_id('car') if self.logger else None
             car = TCar(
                 self.env,
                 self.G,
@@ -44,6 +46,8 @@ class TCarGenerator:
                 self.parking_lot,
                 self.parking_entry,
                 self.carqueues,
+                car_id=car_id,
+                logger=self.logger,
             )
             yield car.departed_event
             

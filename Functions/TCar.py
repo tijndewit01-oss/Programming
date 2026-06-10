@@ -7,7 +7,18 @@ import config
 
 class TCar:
 
-    def __init__(self, env, G, source, density_map, parking_lot, parking_entry, carqueues):
+    def __init__(
+        self,
+        env,
+        G,
+        source,
+        density_map,
+        parking_lot,
+        parking_entry,
+        carqueues,
+        car_id=None,
+        logger=None,
+    ):
         self.env = env
         self.G = G
         self.source = source
@@ -15,6 +26,8 @@ class TCar:
         self.parking_lot = parking_lot
         self.parking_entry = parking_entry
         self.carqueues = carqueues
+        self.car_id = car_id
+        self.logger = logger
         self.passengers = []
         self.departed_event = env.event()
         self.parking_lot_node = config.ROAD_NETWORK['Parkinglot']
@@ -34,6 +47,7 @@ class TCar:
             if len(self.carqueues[self.source].items) > 0:
                 visitor = yield self.carqueues[self.source].get()
                 self.passengers.append(visitor)
+                visitor.set_state('in_car', self.source)
                 continue
 
             remaining = deadline - self.env.now
@@ -44,6 +58,7 @@ class TCar:
             result = yield get | self.env.timeout(remaining)
             if get in result:
                 self.passengers.append(result[get])
+                result[get].set_state('in_car', self.source)
             else:
                 get.cancel()
                 break
@@ -55,22 +70,61 @@ class TCar:
         if not self.passengers:
             return
 
+        depart_time = self.env.now
         self.path = shortest_path(self.G, self.source, self.parking_lot_node , self.density_map)
+        route_length_m = sum(
+            self.density_map.get_length(u, v) or 0
+            for u, v in zip(self.path[:-1], self.path[1:])
+        )
         for u, v in zip(self.path[:-1], self.path[1:]):
             travel_time = edge_travel_time(u, v, self.density_map)
             self.density_map.update_density(u, v, 1) # Increment density for this edge
+            self._log_segment('enter', u, v)
             yield self.env.timeout(travel_time)
             self.density_map.update_density(u, v, -1) # Decrement density after traversing
+            self._log_segment('exit', u, v)
 
+        road_arrival_time = self.env.now
         with self.parking_entry.request() as entry_request:
             yield entry_request
             yield self.env.timeout(config.CAR['ParkingLotEntryDelay']())
 
         self.parking_lot_request = self.parking_lot.request()
         yield self.parking_lot_request
+        for visitor in self.passengers:
+            visitor.set_state('parking', 'parking_lot')
         yield self.env.timeout(config.CAR['FindSpaceParkCar'])
+
+        parked_time = self.env.now
+        if self.logger:
+            self.logger.log_car(
+                car_id=self.car_id,
+                source_node=self.source,
+                capacity=self.passenger_capacity,
+                passenger_count=len(self.passengers),
+                depart_time=depart_time,
+                road_arrival_time=road_arrival_time,
+                parked_time=parked_time,
+                route_length_m=route_length_m,
+            )
 
         for visitor in self.passengers:
             visitor.reactivate()
+
+    def _log_segment(self, event_type, u, v):
+        if not self.logger:
+            return
+        self.logger.log_segment_density(
+            sim_time=self.env.now,
+            event_type=event_type,
+            actor_type='car',
+            actor_id=self.car_id,
+            u=u,
+            v=v,
+            segment_id=f"{u}->{v}",
+            occupancy=self.density_map.get_density(u, v),
+            rho_max=self.density_map.get_rho_max(u, v),
+            length_m=self.density_map.get_length(u, v),
+        )
         
             

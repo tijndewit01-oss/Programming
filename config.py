@@ -39,6 +39,13 @@ SIMULATION: Dict[str, Any] = {
 }
 
 
+# --- LOGGING ---
+LOGGING: Dict[str, Any] = {
+    'OutputDir': 'OUTPUT Data Files/logs',
+    'RunId': None,
+}
+
+
 # --- ROAD_NETWORK ---
 # placeholders; actual network should be loaded from files into these fields
 ROAD_NETWORK: Dict[str, Any] = {
@@ -144,6 +151,7 @@ ALL_SECTIONS: Dict[str, Dict[str, Any]] = {
 	'SIMULATION': SIMULATION,
 	'ROAD_NETWORK': ROAD_NETWORK,
 	'TRAFFIC_MODEL': TRAFFIC_MODEL,
+    'LOGGING': LOGGING,
 	'CAR': CAR,
 	'CAR_GENERATOR': CAR_GENERATOR,
 	'SHUTTLE_BUS': SHUTTLE_BUS,

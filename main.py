@@ -31,6 +31,7 @@ from Functions.TTicketScan import TTicketScan
 from Functions.TShuttleBus import TShuttleBus
 from Functions.TCarGenerator import TCarGenerator
 from Functions.TVisitorGenerator import TVisitorGenerator
+from Functions.SimulationLogger import SimulationLogger
 
 
 NETWORK_PKL = os.path.join('INPUT_Data_Files', 'network.pkl')
@@ -91,6 +92,10 @@ def prepare_start_nodes(G, density_map):
 
 def main():
     env = simpy.Environment(initial_time=config.SIMULATION['EventStartTime'])
+    logger = SimulationLogger(
+        config.LOGGING['OutputDir'],
+        run_id=config.LOGGING.get('RunId'),
+    )
 
     # --- road network + shared traffic-density state ---
     G = load_graph()
@@ -113,17 +118,37 @@ def main():
         env.process(background_density_update(env, G, density_map))
 
     # --- components (PDL Initialization order) ---
-    ticket_scan = TTicketScan(env, ticketqueue)
-    shuttle_bus = TShuttleBus(env, G, density_map, busqueue)
-    car_generator = TCarGenerator(env, G, density_map, parking_lot, parking_entry, carqueues)
-    visitor_generator = TVisitorGenerator(env, busqueue, carqueues, ticketqueue)
+    ticket_scan = TTicketScan(env, ticketqueue, logger)
+    shuttle_bus = TShuttleBus(env, G, density_map, busqueue, logger)
+    car_generator = TCarGenerator(env, G, density_map, parking_lot, parking_entry, carqueues, logger)
+    visitor_generator = TVisitorGenerator(env, busqueue, carqueues, ticketqueue, logger)
 
     # --- run ---
     env.run(until=config.SIMULATION['EventEndingTime'])
 
     # --- summary (per-visitor logging is Phase 5) ---
     waiting_for_car = sum(len(q.items) for q in carqueues.values())
+    logger.log_scenario_summary({
+        'finished_at': env.now,
+        'event_start_time': config.SIMULATION['EventStartTime'],
+        'event_ending_time': config.SIMULATION['EventEndingTime'],
+        'number_visitors_config': config.SIMULATION['NumberVisitors'],
+        'visitors_generated': logger.visitor_count(),
+        'visitors_completed': logger.completed_visitor_count(),
+        'cars_parked': parking_lot.count,
+        'waiting_for_car': waiting_for_car,
+        'waiting_for_shuttle_bus': len(busqueue.items),
+        'waiting_for_ticket_scan': len(ticketqueue.items),
+        'mode_split': dict(config.VISITOR_GENERATOR['ModeSplit']),
+        'n_buses': config.SHUTTLE_BUS['n_buses'],
+        'ticket_scan_lanes': config.TICKET_SCAN['NumScanLanes'],
+        'parking_entry_lanes': config.CAR['ParkingLotEntryLanes'],
+    })
+    logger.flush()
+
     print(f"\nSimulation finished at t = {env.now} s")
+    print(f"Run ID:                      {logger.run_id}")
+    print(f"Logs written to:             {config.LOGGING['OutputDir']}")
     print(f"Cars parked:                 {parking_lot.count}")
     print(f"Visitors still waiting for:")
     print(f"  - a car:                   {waiting_for_car}")

@@ -22,11 +22,12 @@ class TShuttleBus:
     """
 
 
-    def __init__(self, env, G, density_map, busqueue):
+    def __init__(self, env, G, density_map, busqueue, logger=None):
         self.env = env
         self.G = G
         self.density_map = density_map
         self.busqueue = busqueue
+        self.logger = logger
 
         self.capacity = config.SHUTTLE_BUS['capacity']
         self.max_wait = config.SHUTTLE_BUS['MaxWaitTime']
@@ -37,7 +38,7 @@ class TShuttleBus:
         self.destination = config.ROAD_NETWORK['Parkinglot']
 
         n_buses = config.SHUTTLE_BUS['n_buses']
-        self.processes = [env.process(self.run(bus_id)) for bus_id in range(n_buses)]
+        self.processes = [env.process(self.run(bus_id + 1)) for bus_id in range(n_buses)]
 
     def _board(self):
         """Collect up to capacity passengers, or stop after MaxWaitTime.
@@ -55,6 +56,7 @@ class TShuttleBus:
         while len(passengers) < self.capacity:
             if len(self.busqueue.items) > 0:
                 visitor = yield self.busqueue.get()       # FirstOfQueue + LeaveQueue
+                visitor.set_state('in_bus', 'bus')
                 yield self.env.timeout(self.boarding_time)
                 passengers.append(visitor)
                 continue
@@ -64,6 +66,7 @@ class TShuttleBus:
             get = self.busqueue.get()
             result = yield get | self.env.timeout(remaining)
             if get in result:
+                result[get].set_state('in_bus', 'bus')
                 yield self.env.timeout(self.boarding_time)
                 passengers.append(result[get])
             else:
@@ -72,6 +75,7 @@ class TShuttleBus:
         return passengers
 
     def run(self, bus_id):
+        trip_id = 0
         while True:
             # --- boarding phase at the station ---
             passengers = yield from self._board()
@@ -84,13 +88,18 @@ class TShuttleBus:
 
             # --- drive to the festival (PLACEHOLDER for road-network routing) ---
 
+            trip_id += 1
+            depart_time = self.env.now
             path = shortest_path(self.G, self.source, self.destination, self.density_map)
             for u, v in zip(path[:-1], path[1:]):
                 travel_time = edge_travel_time(u, v, self.density_map)
                 self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
+                self._log_segment('enter', bus_id, u, v)
                 yield self.env.timeout(travel_time)
                 self.density_map.update_density(u, v, -self.bus_equivalent) # Decrement density after traversing
+                self._log_segment('exit', bus_id, u, v)
 
+            arrival_time = self.env.now
 
 
             # --- discharge passengers at the festival parking area ---
@@ -103,5 +112,37 @@ class TShuttleBus:
             for u, v in zip(path[:-1], path[1:]):
                 travel_time = edge_travel_time(u, v, self.density_map)
                 self.density_map.update_density(u, v, self.bus_equivalent) # Increment density for this edge
+                self._log_segment('enter_return', bus_id, u, v)
                 yield self.env.timeout(travel_time)
                 self.density_map.update_density(u, v, -self.bus_equivalent) # Decrement density after traversing
+                self._log_segment('exit_return', bus_id, u, v)
+
+            return_arrival_time = self.env.now
+            if self.logger:
+                self.logger.log_bus_trip(
+                    bus_id=bus_id,
+                    trip_id=trip_id,
+                    depart_time=depart_time,
+                    arrival_time=arrival_time,
+                    return_arrival_time=return_arrival_time,
+                    passenger_count=len(passengers),
+                    capacity=self.capacity,
+                    load_factor=len(passengers) / self.capacity,
+                    station_queue_left=len(self.busqueue.items),
+                )
+
+    def _log_segment(self, event_type, bus_id, u, v):
+        if not self.logger:
+            return
+        self.logger.log_segment_density(
+            sim_time=self.env.now,
+            event_type=event_type,
+            actor_type='bus',
+            actor_id=bus_id,
+            u=u,
+            v=v,
+            segment_id=f"{u}->{v}",
+            occupancy=self.density_map.get_density(u, v),
+            rho_max=self.density_map.get_rho_max(u, v),
+            length_m=self.density_map.get_length(u, v),
+        )

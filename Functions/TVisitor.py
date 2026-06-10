@@ -19,8 +19,10 @@ class TVisitor:
     into the visitor, car, shuttle, and ticket-scan components.
     """
 
-    def __init__(self, env, busqueue, carqueues, ticketqueue):
+    def __init__(self, env, busqueue, carqueues, ticketqueue, visitor_id=None, logger=None):
         self.env = env
+        self.visitor_id = visitor_id
+        self.logger = logger
 
         #Determine the mode of transport for the visitor based on the mode split in config
         mode_split = config.VISITOR_GENERATOR['ModeSplit']
@@ -46,6 +48,17 @@ class TVisitor:
         # PDL attributes
         self.depart_time = env.now   # DepartTime = Now
         self.arrival_time = None     # ArrivalTime, set when the visitor exits the system
+        self.current_state = 'generated'
+
+        if self.logger:
+            self.logger.register_visitor(
+                self.visitor_id,
+                self.mode,
+                self.start_node_name,
+                self.start_node,
+                self.depart_time,
+            )
+            self.set_state('generated', self.start_node_name)
 
         # Reactivation event (replaces PDL Passivate / Reactivate)
         self._wake = env.event()
@@ -57,24 +70,43 @@ class TVisitor:
         if not self._wake.triggered:
             self._wake.succeed()
 
+    def set_state(self, state, location=''):
+        self.current_state = state
+        if self.logger:
+            self.logger.log_visitor_state(
+                self.visitor_id,
+                self.env.now,
+                state,
+                mode=self.mode,
+                location=location,
+            )
+
     def run(self):
         # --- get to the parking area / drop-off, depending on mode ---
         if self.mode != 'car':
             # Public transport: walk to the shuttle stop and queue for the bus
+            self.set_state('walking_to_bus', self.start_node_name)
             yield self.env.timeout(self.shuttlebus_walktime)
+            self.set_state('waiting_bus', 'bus_stop')
             self.busqueue.put(self)   # EnterQueue
             yield self._wake                                  # Passivate; bus reactivates
             self._wake = self.env.event()
         else:
             # Car: join the carpool queue and wait until the car has parked
+            self.set_state('waiting_car', self.start_node_name)
             self.carqueues[self.start_node].put(self)         # EnterQueue
             yield self._wake                                  # Passivate; car reactivates
             self._wake = self.env.event()
 
         # --- both modes merge here: walk to the ticket scan and get scanned ---
+        self.set_state('walking_ticket', 'parking_area')
         yield self.env.timeout(self.ticket_walktime)
+        self.set_state('waiting_ticket', 'ticket_scan')
         self.ticketqueue.put(self)          # EnterQueue
         yield self._wake                                      # Passivate; scanner reactivates
 
         # ArrivalTime = Now (visitor has passed the festival entrance)
         self.arrival_time = self.env.now
+        self.set_state('scanned', 'ticket_scan')
+        if self.logger:
+            self.logger.complete_visitor(self.visitor_id, self.arrival_time)

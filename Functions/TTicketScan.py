@@ -19,8 +19,9 @@ class TTicketScan:
     scanner until a visitor is available.
     """
 
-    def __init__(self, env, ticketqueue):
+    def __init__(self, env, ticketqueue, logger=None):
         self.env = env
+        self.logger = logger
 
         # Shared FIFO queue of visitors waiting to be scanned (PDL: MyQueue).
         # Created in main.py and injected so all shared queues live in one place.
@@ -36,5 +37,6 @@ class TTicketScan:
         while True:
             # Wait (Standby) until a visitor is queued, then take the first one
             visitor = yield self.queue.get()        # FirstOfQueue + LeaveQueue
+            visitor.set_state('scanning', 'ticket_scan')
             yield self.env.timeout(self.scan_time)   # Wait ScanTicket
             visitor.reactivate()                     # visitor leaves the system
