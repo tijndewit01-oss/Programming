@@ -160,21 +160,22 @@ X Export replay as self-contained OUTPUT Data Files/simulation_replay.html
 - Add hover tooltips per segment (density, speed, car count)
 
 Phase 9: Visualisation: Static Figures
-- Build travel time histogram with mean line and percentile band
-- Build CDF of travel times alongside the histogram
+X Build travel time histogram with mean/median reference lines in dashboard
+X Build CDF of travel times alongside the histogram
 - Build segment density over time line chart with real loop detector data overlaid
 - Build mode split sensitivity grouped bar chart (travel time, density, CO2, queue wait)
-- Build CO2 stacked bar chart per scenario with reference line
-- Build bus utilisation heatmap (trip number vs departure time vs load fraction)
-- Build visitor arrival funnel as stacked area chart (time per journey phase)
+X Build CO2 stacked bar chart per scenario in dashboard
+X Build bus utilisation heatmap (trip number vs bus id vs load fraction)
+X Build visitor arrival funnel as stacked area chart (time per journey phase)
+X Build road congestion hotspot chart from segment density snapshots
 - Set up batch export of all figures to PNG
 
 Phase 10: Interactive Visualisation
 X Build interactive simulation replay with time slider, roads, shuttle buses,
     queues/parking occupancy, and visitor journey-state panels
-- Build Plotly Sankey diagram of visitor flow through journey phases
-- Build scenario comparison dashboard (two simulation outputs side by side)
-- Export dashboard as standalone .html
+X Build Plotly Sankey diagram of visitor flow through journey phases
+X Build scenario comparison dashboard across logged simulation runs
+X Export dashboard as standalone OUTPUT Data Files/simulation_dashboard.html
 
 Phase 11: Final Integration
 - Write a single run script that executes simulation, saves outputs, and triggers all visualisations
@@ -198,8 +199,10 @@ project/
 │                               VISITOR, VISITOR_GENERATOR. No runtime objects.
 │
 ├── visualisation.py         ← Reads output CSVs/JSONs and produces the Prompt 3
-│                               Plotly simulation replay HTML. Later dashboard/static
-│                               figures still need to be added here.
+│                               Plotly simulation replay HTML.
+│
+├── dashboard.py             ← Reads output logs and produces the Prompt 4
+│                               standalone Plotly analysis dashboard HTML.
 │
 ├── functions/
 │   ├── TrafficFlowModel.py  ← Core traffic model. Contains:
