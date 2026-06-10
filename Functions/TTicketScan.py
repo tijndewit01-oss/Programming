@@ -1,4 +1,3 @@
-import simpy
 import config
 #The TTicketScan class (PDL: TTicketScan)
 
@@ -12,8 +11,8 @@ class TTicketScan:
     experimental design parameter (too few -> the queue grows uncontrollably;
     too many -> scanners sit idle).
 
-    The shared queue is created here and registered in
-    config.TICKET_SCAN['MyQueue'] so that visitors can reach it (see TVisitor).
+    The shared queue is created in main.py and injected into both visitors and
+    ticket scanners.
 
     SimPy translation note: the PDL `while MyQueue.Length == 0: Standby` busy
     wait is replaced by a blocking `yield self.queue.get()`, which suspends the

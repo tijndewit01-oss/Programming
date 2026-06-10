@@ -29,8 +29,8 @@ X Implement TShuttleBus: self-jam and shared-path bugs fixed; baseline capacity 
 X Implement TTicketScan: logic done; queue injected from main
 X Implement Initialization: main.py wires env, graph, density_map, all queues, parking lot,
     background density, and all processes; runs end-to-end. Queues all created in main.py.
-    NOTE: contains init-time guards for DATA BUGS #8/#9 (see below) — those are workarounds,
-    not real fixes.
+    NOTE: contains an init-time guard for DATA BUG #8 (see below) — that is a workaround,
+    not the real node-data fix.
 
 ==========================================================================
 KNOWN BUGS / CORRECTNESS ISSUES (found 2026-06-07 full audit; sim runs but results are WRONG)
@@ -91,23 +91,27 @@ FIXED FOR BASELINE 2026-06-10  BUG #7  Current baseline capacity does not clear 
     to be calibrated before claiming baseline validity.
     UPDATE: baseline capacity retuned to n_buses=2 and NumScanLanes=8. The 8 scan lanes
     are based on the report's observed peak of ~1045 scans/30 min and 13 s scan+bag-search
-    service time. Main now finishes with no visible car/shuttle/ticket queues in the latest
-    run. A seeded instrumented run completed 5078/5100 by midnight, with the remaining
-    visitors late in process; Phase 5 logging should track these states explicitly.
+    service time. Main now finishes with no large artificial queues (latest unseeded run:
+    3 visitors still waiting for shuttle, 0 at car/ticket queues). A seeded instrumented
+    run completed 5078/5100 by midnight, with the remaining visitors late in process;
+    Phase 5 logging should track these states explicitly.
 
 --- DATA ISSUES (need the data/nodes fixed, currently worked around in main.py) ---
 !!! BUG #8  Node3 (3620826627) has no path to the parking lot in the directed graph.
     main.prepare_start_nodes drops it with a warning (loses ~2.6% of car entry points).
     FIX: correct the node id / graph so all entry points reach the parking lot.
 
-!!! BUG #9  CarStartNodeProb sums to ~0.79, not 1.0 (config.ROAD_NETWORK).
+FIXED 2026-06-10  BUG #9  CarStartNodeProb sums to ~0.79, not 1.0 (config.ROAD_NETWORK).
     np.random.choice requires p to sum to 1; main.prepare_start_nodes renormalises as a
     guard. FIX: correct the entry-point probability weights in config.
+    FIXED: CarStartNodeProb now sums to 1.0 across the currently reachable start nodes.
+    Node3 remains in StartNodes for BUG #8, but is intentionally excluded from the
+    sampling probabilities until its route to the parking lot is fixed.
 
 --- minor / cleanup ---
-!   Stale docstrings claim queues are registered in config (TShuttleBus, TTicketScan);
-    queues are now injected from main. Unused imports: simpy in TTicketScan, random/simpy
-    in TCarGenerator, and the large commented-out old TCarGenerator block.
+FIXED 2026-06-10  Stale docstrings/imports/commented code cleaned up.
+    Queue docstrings now describe main.py injection, unused imports were removed, and
+    the large commented-out old TCarGenerator block was deleted.
 ==========================================================================
 
 Phase 5: Output Logging
@@ -250,8 +254,8 @@ Bas: DONE - cleaned up functions, moved all queues to main, built Initialization
      DONE 2026-06-10 - retuned baseline capacity for BUG #7 (2 buses, 8 scan lanes).
      Next: Phase 5 logging, then validation of the retuned capacities.
 
-Tijn: Fix imports of data/nodes -> this is BUG #8 (Node3 no path to parking) and
-      BUG #9 (CarStartNodeProb sums to 0.79). main.py currently works around both.
+Tijn: Fix imports of data/nodes -> BUG #8 remains (Node3 no path to parking).
+      BUG #9 is fixed in config by normalising the reachable-node probabilities.
 
 
 

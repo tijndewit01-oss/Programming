@@ -51,11 +51,11 @@ def load_graph():
 def prepare_start_nodes(G, density_map):
     """Validate and clean the car entry-node data before the run.
 
-    Two init-time guards for known data issues (see TASKLIST: "Fix nodes"):
+    Init-time guards for known data issues (see TASKLIST: "Fix nodes"):
       - Drop any start node that cannot reach the parking lot in the directed
         graph (otherwise its cars crash on shortest_path).
-      - Normalise the entry probabilities to sum to 1 (np.random.choice requires
-        this; the raw config weights currently sum to ~0.82).
+      - Validate/normalise the remaining entry probabilities so np.random.choice
+        always receives a valid distribution.
 
     Mutates config.ROAD_NETWORK in place so TVisitor / TCarGenerator pick up the
     cleaned values, and returns the cleaned {name: node_id} dict.

@@ -15,11 +15,8 @@ class TVisitor:
     component (car, shuttle bus, or ticket scan) calls self.reactivate() to
     wake it again.
 
-    Queue dependencies (set up by the other components when they are built):
-      - config.CAR['MyCarQueue']        : car carpool queue   (TCarGenerator/TCar)
-      - config.SHUTTLE_BUS['MyBusQueue'] : shuttle stop queue  (TShuttleBus)
-      - config.TICKET_SCAN['MyQueue']    : ticket scan queue   (TTicketScan)
-    These should be simpy.Store instances created once the SimPy env exists.
+    Queue dependencies are SimPy Store instances created in main.py and injected
+    into the visitor, car, shuttle, and ticket-scan components.
     """
 
     def __init__(self, env, busqueue, carqueues, ticketqueue):
@@ -70,7 +67,7 @@ class TVisitor:
             self._wake = self.env.event()
         else:
             # Car: join the carpool queue and wait until the car has parked
-            self.carqueues[self.start_node] .put(self)         # EnterQueue
+            self.carqueues[self.start_node].put(self)         # EnterQueue
             yield self._wake                                  # Passivate; car reactivates
             self._wake = self.env.event()
 

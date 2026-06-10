@@ -1,5 +1,4 @@
 #The TShuttleBus class (PDL: TShuttleBus)
-import simpy
 from Functions.Trafficflowmodel import shortest_path, edge_travel_time
 import config
 
@@ -11,17 +10,15 @@ class TShuttleBus:
     the festival, release passengers, drive back empty, repeat.
 
     The PDL describes a single bus. Here we honour SHUTTLE_BUS['n_buses'] by
-    running that many bus processes over one shared boarding queue, which is
-    created here and registered in config.SHUTTLE_BUS['MyBusQueue'] so visitors
-    can reach it (see TVisitor).
+    running that many bus processes over one shared boarding queue injected by
+    main.py.
 
     SimPy translation note: the PDL Standby boarding loop is implemented by
     racing a queued arrival against the remaining wait time. Passengers are
     "reactivated" once the bus reaches the festival.
 
-    PLACEHOLDER: road-network travel (node-to-node routing, TrafficDensity /
-    BusEquivalent updates, NodeLog) is not yet implemented. The drive phases use
-    a fixed DRIVE_TIME until roadnetwork.py (GetRoute / GetDistance) is ready.
+    Road-network travel is routed dynamically over the OSMnx graph using the
+    shared density map.
     """
 
 
@@ -75,7 +72,6 @@ class TShuttleBus:
         return passengers
 
     def run(self, bus_id):
-        trip_index = 0
         while True:
             # --- boarding phase at the station ---
             passengers = yield from self._board()

@@ -16,8 +16,7 @@ Update values here or replace placeholders with real distribution objects.
 Call `init_runtime_objects()` at program start to create runtime-only objects.
 """
 
-from typing import List, Tuple, Dict, Any
-from queue import Queue
+from typing import Tuple, Dict, Any
 
 
 # Type aliases
@@ -45,7 +44,13 @@ SIMULATION: Dict[str, Any] = {
 ROAD_NETWORK: Dict[str, Any] = {
 
     'StartNodes':  {'Node1': 46354890, 'Node2': 46336597, 'Node3': 3620826627, 'Node4': 46493064, 'Node5': 3611512307},
-    'CarStartNodeProb': {'Node1': 0.4854844416, 'Node2': 0.009832219139, 'Node3': 0.02623787267, 'Node4': 0.0528667995, 'Node5': 0.24214074226}, #PLACEHOLDER, check route
+    # Node3 is intentionally excluded until BUG #8 is fixed: it has no directed path to the parking lot.
+    'CarStartNodeProb': {
+        'Node1': 0.6142851757100457,
+        'Node2': 0.01244074154367358,
+        'Node4': 0.0668925478086531,
+        'Node5': 0.30638153493762754,
+    },
     
     'Bus_start': 46477307,
     'Parkinglot': 46445656,
