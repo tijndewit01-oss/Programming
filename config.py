@@ -31,7 +31,7 @@ SIMULATION: Dict[str, Any] = {
 	'NumberVisitors': 5100, #PLACEHOLDER
 
 	# event ending time in simulation time units (e.g., seconds)
-    'EventStartTime': 64800, #18:00 in seconds
+    'EventStartTime': 63000, #17:30 in seconds
 	'EventEndingTime': 86400, #24:00 in seconds (Saturday)
 
 	# time unit description (for documentation only)

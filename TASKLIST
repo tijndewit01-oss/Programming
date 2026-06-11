@@ -157,7 +157,7 @@ X Add static map markers for car entry nodes, train station/shuttle stop, and me
     car parking & festival entrance locations
 X Export replay as self-contained OUTPUT Data Files/simulation_replay.html
 - Export segment density time series to GeoJSON format if a Folium deliverable is still required
-- Add hover tooltips per segment (density, speed, car count)
+X Add hover tooltips per segment (density, speed, car count)
 
 Phase 9: Visualisation: Static Figures
 X Build travel time histogram with mean/median reference lines in dashboard

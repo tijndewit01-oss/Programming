@@ -5,6 +5,9 @@ full scenario-analysis dashboard.
 """
 
 from __future__ import annotations
+import time
+
+
 
 import bisect
 import json
@@ -362,8 +365,15 @@ def road_bucket_payloads(rows: pd.DataFrame, edge_lookup: dict[str, dict[str, An
 
         ratio = safe_float(getattr(row, 'congestion_ratio', 0), default=0.0)
         bucket_index = road_bucket_index(ratio)
+<<<<<<< Updated upstream
         payloads[bucket_index]['x'].extend(edge['x'])
         payloads[bucket_index]['y'].extend(edge['y'])
+=======
+        hover_string = f"Density: {row.occupancy:.2f}, Max Density: {row.rho_max:.2f}, Speed: {row.speed_ms * 3.6:.1f} kph, Max Speed: {row.max_speed_ms * 3.6:.1f} kph, Car count: {int(row.occupancy * row.length_m)}"
+        payloads[bucket_index]['x'].extend(edge['x'])
+        payloads[bucket_index]['y'].extend(edge['y'])
+        payloads[bucket_index]['hovertext'].extend([hover_string] * len(edge['x']))
+>>>>>>> Stashed changes
         payloads[bucket_index]['x'].append(None)
         payloads[bucket_index]['y'].append(None)
 
@@ -637,7 +647,9 @@ def build_simulation_replay(
 ) -> str:
     selected_run_id, logs, summary = load_logs(log_dir, run_id)
     edge_lookup, node_lookup, bounds = load_network(network_path)
+
     frame_times = build_frame_times(logs, summary, frame_step_seconds)
+
 
     road_snapshots = build_road_snapshots(logs['segments'], edge_lookup)
     road_snapshot_times = sorted(road_snapshots)
@@ -662,8 +674,10 @@ def build_simulation_replay(
         location_marker_groups=location_marker_groups,
     )
 
+    t = time.time()
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     fig.write_html(output_path, include_plotlyjs=True, full_html=True)
+    print(f"HTML written: {time.time()-t:.1f}s")
     return output_path
 
 
@@ -697,7 +711,7 @@ def create_replay_figure(
 
     first_time = frame_times[0]
     static_network = build_static_network_payload(edge_lookup)
-    first_roads = road_payload_at(first_time, road_snapshots, road_snapshot_times)
+    first_roads = road_payload_at(first_time, road_snapshots, road_snapshot_times)[0]
     first_queues = queue_values_at(first_time, queue_series)
     first_states = state_values_at(first_time, visitor_state_series)
     first_buses = bus_series[first_time]
@@ -785,7 +799,8 @@ def create_replay_figure(
     )
 
     add_location_markers(fig, location_marker_groups)
-
+    
+    t = time.time()
     fig.frames = build_frames(
         run_id=run_id,
         summary=summary,
@@ -796,7 +811,7 @@ def create_replay_figure(
         visitor_state_series=visitor_state_series,
         bus_series=bus_series,
     )
-
+    print(f"Frames built: {time.time()-t:.1f}s")
     configure_layout(fig, run_id, summary, bounds, frame_times, queue_series, visitor_state_series)
     return fig
 
@@ -826,7 +841,6 @@ def add_location_markers(fig: go.Figure, location_marker_groups: list[dict[str, 
             col=1,
         )
 
-
 def build_frames(
     run_id: str,
     summary: dict[str, Any],
@@ -838,12 +852,15 @@ def build_frames(
     bus_series: dict[float, dict[str, list[Any]]],
 ) -> list[go.Frame]:
     frames: list[go.Frame] = []
+    prev_snapshot_time = None
+    prev_road_traces = None
     for frame_time in frame_times:
-        roads = road_payload_at(frame_time, road_snapshots, road_snapshot_times)
+        roads, snapshot_time = road_payload_at(frame_time, road_snapshots, road_snapshot_times)
         queues = queue_values_at(frame_time, queue_series)
         states = state_values_at(frame_time, visitor_state_series)
         buses = bus_series[frame_time]
 
+<<<<<<< Updated upstream
         frame_data: list[Any] = []
         for payload in roads:
             frame_data.append(go.Scatter(x=payload['x'], y=payload['y']))
@@ -870,17 +887,49 @@ def build_frames(
                 text=states['text'],
             )
         )
+=======
+        if snapshot_time == prev_snapshot_time:
+            road_traces = prev_road_traces
+        else:
+            road_traces = [
+                {'type': 'scatter', 'x': payload['x'], 'y': payload['y'], 'hovertext': payload['hovertext']}
+                for payload in roads
+            ]
+            prev_road_traces = road_traces
+            prev_snapshot_time = snapshot_time
+
+        frame_data: list[Any] = list(road_traces)
+        frame_data.append({
+            'type': 'scatter',
+            'x': buses['x'],
+            'y': buses['y'],
+            'text': buses['text'],
+            'hovertext': buses['hovertext'],
+            'marker': {'color': buses['color']},
+        })
+        frame_data.append({
+            'type': 'bar',
+            'x': queues['values'],
+            'y': queues['labels'],
+            'text': queues['text'],
+        })
+        frame_data.append({
+            'type': 'bar',
+            'x': states['values'],
+            'y': states['labels'],
+            'text': states['text'],
+        })
+>>>>>>> Stashed changes
 
         frames.append(
             go.Frame(
                 name=str(int(frame_time)),
                 data=frame_data,
                 traces=[1, 2, 3, 4, 5, 6, 7],
-                layout=go.Layout(title_text=replay_title(run_id, summary, frame_time)),
+                layout={'title': {'text': replay_title(run_id, summary, frame_time)}},
             )
         )
     return frames
-
 
 def configure_layout(
     fig: go.Figure,
@@ -1014,7 +1063,7 @@ def road_payload_at(
     index = bisect.bisect_right(road_snapshot_times, frame_time) - 1
     if index < 0:
         index = 0
-    return road_snapshots[road_snapshot_times[index]]
+    return road_snapshots[road_snapshot_times[index]], road_snapshot_times[index]
 
 
 def queue_values_at(frame_time: float, queue_series: dict[float, dict[str, float]]) -> dict[str, list[Any]]:
