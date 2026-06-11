@@ -238,6 +238,7 @@ def main():
     print(f"Run ID:                      {logger.run_id}")
     print(f"Logs written to:             {config.LOGGING['OutputDir']}")
     print(f"Cars parked:                 {parking_lot.count}")
+    print(f"Cars waiting at parking lot  {len(parking_entry.queue)}")
     print(f"Visitors still waiting for:")
     print(f"  - a car:                   {waiting_for_car}")
     print(f"  - the shuttle bus:         {len(busqueue.items)}")

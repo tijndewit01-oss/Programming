@@ -202,20 +202,24 @@ def background_density_update(env, G, density_map):
     identity: density = flow / speed. The flow data is indexed by hour of the day.
 
     To avoid abrupt jumps at the top of each hour, the transition is smoothed with
-    linear interpolation. The process wakes up `interpolate/2` seconds before each hour
-    boundary and then steps 60 seconds at a time across the full `interpolate`-second
-    window, blending from the current-hour density to the next-hour density.
+    linear interpolation. Each hour-boundary B has a ramp window
+    [B - interpolate/2, B + interpolate/2] going hour-(B/3600 - 1) -> hour-(B/3600).
+    Outside any window the value is flat at the surrounding plateau hour.
+
+    This version is robust to a simulation start time that lands mid-ramp: the initial
+    density is seeded at the correct interpolated value, and the loop finishes only the
+    remainder of the window it starts inside.
 
     Two road types are treated differently:
       - N-roads (ref 'N35' or 'N348'): major state roads; use the flow density directly.
       - All other roads: local roads; flow density is scaled down by N_local, a config
         factor expressing what fraction of N-road traffic also loads the local network.
     """
-    interpolate = config.ROAD_NETWORK['Interpolate']    # total width of the interpolation window around each hour boundary [s]
-    convert_N_local = config.ROAD_NETWORK['N_local']    # scaling factor: converts N-road flow density to equivalent local-road background density
-    flow = pd.read_csv('INPUT_Data_Files/ROAD_DATA/flow_2_3_avg.csv')['Avg Saturday (all det)']  # hourly vehicle counts [veh/h], index = integer hour of the day
-    t_start = config.SIMULATION['EventStartTime']       # simulation start time [s since midnight]
-    t_end = config.SIMULATION['EventEndingTime']         # simulation end time [s since midnight]
+    interpolate = config.ROAD_NETWORK['Interpolate']
+    convert_N_local = config.ROAD_NETWORK['N_local']
+    flow = pd.read_csv('INPUT_Data_Files/ROAD_DATA/flow_2_3_avg.csv')['Avg Saturday (all det)']
+    t_start = config.SIMULATION['EventStartTime']
+    t_end = config.SIMULATION['EventEndingTime']
 
     def edge_background_counts(data):
         """Convert hourly road flow [veh/h] into vehicles present on this edge."""
@@ -225,61 +229,90 @@ def background_density_update(env, G, density_map):
             return flow * 0.0
         return (flow / (u_max_ms * 3.6)) * length_km
 
-    #Initial set of density
-    # Before any SimPy events run, set each edge's background density to the value
-    # corresponding to the starting hour so the simulation begins with realistic congestion
-    for u, v, data in G.edges(data=True):
-        ref = data.get('ref', None)            # road reference string (e.g. 'N35'); identifies whether this is an N-road
-        flow_count = edge_background_counts(data)
+    def clamp_hour(h):
+        """Keep an hour index inside the valid range of the flow array."""
+        return max(0, min(h, len(flow) - 1))
 
-        # int(t_start / 3600) gives the integer hour index into the flow array
-        if ref in ('N35', 'N348'):
-            rho_background_value = flow_count[int(t_start / 3600)]
+    def interpolated_value(now, flow_count, ref):
+        """Return the correct background vehicle count for one edge at absolute time `now`.
+
+        Inside a ramp window centred on the nearest hour boundary: blend linearly from
+        current_hour -> next_hour. On a plateau: hold the flat hour value.
+        Applies N_local scaling for non-N-roads.
+        """
+        boundary = round(now / 3600) * 3600     # nearest hour boundary in seconds
+        delta = now - boundary                  # signed offset from that boundary [s]
+
+        if abs(delta) <= interpolate / 2:
+            # inside a ramp window centred on this boundary
+            next_hour = clamp_hour(int(boundary // 3600))
+            current_hour = clamp_hour(int(boundary // 3600) - 1)
+            t = interpolate / 2 + delta         # 0 at window start, interpolate at window end
+            frac = t / interpolate
         else:
-            rho_background_value = convert_N_local * flow_count[int(t_start / 3600)]
-        density_map.set_rho_background(u, v, rho_background_value)
+            # on a plateau: hold whichever hour we're sitting in
+            plateau_hour = clamp_hour(int(boundary // 3600) if delta >= 0 else int(boundary // 3600) - 1)
+            current_hour = next_hour = plateau_hour
+            frac = 0.0
+
+        value = flow_count[current_hour] + (flow_count[next_hour] - flow_count[current_hour]) * frac
+        if ref not in ('N35', 'N348'):
+            value *= convert_N_local
+        return value
+
+    # --- Initial density: correct even if t_start lands mid-ramp ---
+    for u, v, data in G.edges(data=True):
+        ref = data.get('ref', None)
+        flow_count = edge_background_counts(data)
+        density_map.set_rho_background(u, v, interpolated_value(t_start, flow_count, ref))
+
     while True:
-        current_hour = int(env.now // 3600)    # integer hour index of the hour currently in progress
-        next_hour = current_hour + 1            # integer hour index of the next hour (interpolation target)
-        seconds_to_next_hour = 3600 - (env.now % 3600) #3600 seconds in an hour minus the current time how many seconds are left of the hour
-        # Stop the process if the start of the next interpolation window (interpolate/2 s before the
-        # next hour boundary) would fall at or after the end of the simulation
-        if (next_hour * 3600 - interpolate/2) >= t_end:
+        boundary = round(env.now / 3600) * 3600     # nearest hour boundary to current sim time
+        delta = env.now - boundary
+
+        # Decide which ramp window to process next.
+        if abs(delta) < interpolate / 2:
+            # Already inside this boundary's window: finish the remainder of THIS window.
+            target_boundary = boundary
+        else:
+            # On a plateau: next window belongs to the upcoming boundary.
+            target_boundary = boundary + 3600 if delta >= interpolate / 2 else boundary
+            window_start = target_boundary - interpolate / 2
+            if window_start > env.now:
+                yield env.timeout(window_start - env.now)   # sleep until window start
+
+        next_hour = int(target_boundary // 3600)
+        current_hour = next_hour - 1
+
+        # Stop if this window's start falls at or after simulation end.
+        if (target_boundary - interpolate / 2) >= t_end:
             break
-        # Stop once we run past the last hour the flow data covers (indices 0..len-1),
-        # otherwise flow[next_hour] would index out of bounds.
+        # Stop once we'd index past the last hour the flow data covers.
         if next_hour >= len(flow):
             break
-        # Sleep until interpolate/2 seconds before the next full hour so the interpolation
-        # window is centred symmetrically on the hour boundary
-        yield env.timeout(seconds_to_next_hour - int(interpolate/2))
 
-        for step in range(int(interpolate/60)):
-            #Calculate flow
+        current_hour = clamp_hour(current_hour)
+        next_hour = clamp_hour(next_hour)
 
-            # Elapsed time within the interpolation window [s]; increases by 60 s each step
-            t = step * 60
+        # Step through the window every 60 s from wherever we currently are.
+        window_end = target_boundary + interpolate / 2
+        while env.now < window_end:
+            t = interpolate / 2 + (env.now - target_boundary)  # elapsed in window [s]
+            frac = t / interpolate
             for u, v, data in G.edges(data=True):
                 ref = data.get('ref', None)
                 flow_count = edge_background_counts(data)
-
-
-                if ref in ('N35', 'N348'):
-                    # Linear interpolation: at t=0 the value equals current_hour density;
-                    # at t=interpolate it equals next_hour density
-                    rho_background_value = (flow_count[current_hour] +
-                                            (flow_count[next_hour] - flow_count[current_hour])
-                                            * (t/interpolate))
-                else:
-                    rho_background_value = convert_N_local * (
-                        flow_count[current_hour] +
-                        (flow_count[next_hour] - flow_count[current_hour])
-                        * (t/interpolate)
-                    )
+                rho_background_value = (flow_count[current_hour] +
+                                        (flow_count[next_hour] - flow_count[current_hour]) * frac)
+                if ref not in ('N35', 'N348'):
+                    rho_background_value *= convert_N_local
                 density_map.set_rho_background(u, v, rho_background_value)
 
-            yield env.timeout(60)  # advance the simulation clock by 60 s before computing the next interpolation step
-
+            step = min(60, window_end - env.now)    # don't overshoot the window end
+            if step <= 0:
+                break
+            yield env.timeout(step)
+    
 
 # Module-level shared density map used across the simulation
 traffic_density = TrafficDensityMap()
