@@ -101,7 +101,7 @@ FIXED FOR BASELINE 2026-06-10  BUG #7  Current baseline capacity does not clear 
     run completed 5078/5100 by midnight, with the remaining visitors late in process;
     Phase 5 logging should track these states explicitly.
 
---- DATA ISSUES (need the data/nodes fixed, currently worked around in main.py) ---
+FIXED DATA ISSUES (need the data/nodes fixed, currently worked around in main.py) ---
 !!! BUG #8  Node3 (3620826627) has no path to the parking lot in the directed graph.
     main.prepare_start_nodes drops it with a warning (loses ~2.6% of car entry points).
     FIX: correct the node id / graph so all entry points reach the parking lot.

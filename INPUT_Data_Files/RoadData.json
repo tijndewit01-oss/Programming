@@ -2,7 +2,7 @@
   "version": 0.6,
   "generator": "Overpass API 0.7.62.11 87bfad18",
   "osm3s": {
-    "timestamp_osm_base": "2026-06-06T13:39:30Z",
+    "timestamp_osm_base": "2026-06-11T12:00:10Z",
     "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
   },
   "elements": [
@@ -1949,6 +1949,67 @@
         "smoothness": "good",
         "surface": "asphalt",
         "zone:traffic": "NL:urban"
+      }
+    },
+    {
+      "type": "way",
+      "id": 6809590,
+      "nodes": [
+        3620826627,
+        9275103354,
+        46522763,
+        46521459,
+        9275103353,
+        1557677167,
+        9275103352,
+        46519044,
+        1557677164
+      ],
+      "tags": {
+        "agricultural": "yes",
+        "bicycle": "no",
+        "foot": "no",
+        "highway": "primary",
+        "highway_authority_ref": "Rijksweg 835",
+        "lanes": "1",
+        "maxspeed": "80",
+        "mofa": "no",
+        "moped": "no",
+        "name": "Heinoseweg",
+        "oneway": "yes",
+        "operator": "Rijkswaterstaat",
+        "ref": "N35",
+        "source:maxspeed": "NL:rural",
+        "surface": "asphalt",
+        "zone:traffic": "NL:rural"
+      }
+    },
+    {
+      "type": "way",
+      "id": 6809626,
+      "nodes": [
+        3620826627,
+        46527746
+      ],
+      "tags": {
+        "agricultural": "yes",
+        "bicycle": "no",
+        "foot": "no",
+        "highway": "primary",
+        "highway_authority_ref": "Rijksweg 835",
+        "lanes": "3",
+        "lanes:backward": "1",
+        "lanes:forward": "2",
+        "maxspeed": "80",
+        "mofa": "no",
+        "moped": "no",
+        "name": "Heinoseweg",
+        "operator": "Rijkswaterstaat",
+        "ref": "N35",
+        "source:maxspeed": "NL:rural",
+        "surface": "asphalt",
+        "turn:lanes:forward": "left|none",
+        "zone:traffic": "NL:rural"
       }
     },
     {
@@ -17139,9 +17200,27 @@
     },
     {
       "type": "node",
+      "id": 46519044,
+      "lat": 52.4046536,
+      "lon": 6.2614233
+    },
+    {
+      "type": "node",
+      "id": 46521459,
+      "lat": 52.405541,
+      "lon": 6.2604582
+    },
+    {
+      "type": "node",
       "id": 1557677164,
       "lat": 52.4042819,
       "lon": 6.2619189
+    },
+    {
+      "type": "node",
+      "id": 1557677167,
+      "lat": 52.4050819,
+      "lon": 6.2609265
     },
     {
       "type": "node",
@@ -17193,6 +17272,18 @@
     },
     {
       "type": "node",
+      "id": 9275103352,
+      "lat": 52.4048653,
+      "lon": 6.2611724
+    },
+    {
+      "type": "node",
+      "id": 9275103353,
+      "lat": 52.4052993,
+      "lon": 6.2606963
+    },
+    {
+      "type": "node",
       "id": 10024286696,
       "lat": 52.4031491,
       "lon": 6.2636601
@@ -17205,6 +17296,18 @@
     },
     {
       "type": "node",
+      "id": 46527746,
+      "lat": 52.4074544,
+      "lon": 6.2586591
+    },
+    {
+      "type": "node",
+      "id": 46522763,
+      "lat": 52.4059556,
+      "lon": 6.2600646
+    },
+    {
+      "type": "node",
       "id": 3620826627,
       "lat": 52.4068436,
       "lon": 6.2592413
@@ -17214,6 +17317,12 @@
       "id": 9275103344,
       "lat": 52.4067356,
       "lon": 6.2593947
+    },
+    {
+      "type": "node",
+      "id": 9275103354,
+      "lat": 52.4067274,
+      "lon": 6.2593183
     },
     {
       "type": "node",
@@ -19138,8 +19247,8 @@
     {
       "type": "node",
       "id": 46419698,
-      "lat": 52.3785001,
-      "lon": 6.2945209
+      "lat": 52.3784929,
+      "lon": 6.2945572
     },
     {
       "type": "node",

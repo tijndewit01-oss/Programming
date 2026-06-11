@@ -139,6 +139,7 @@ def edge_state(u: int, v: int, density_map: TrafficDensityMap) -> dict:
     background_occupancy = density_map.get_background_density(u, v)
     rho_max = density_map.get_rho_max(u, v)
     length_m = density_map.get_length(u, v)
+    max_speed_ms = density_map.get_u_max_ms(u, v)
     travel_time_s = edge_travel_time(u, v, density_map)
     if travel_time_s and travel_time_s != float('inf'):
         speed_ms = length_m / travel_time_s
@@ -148,12 +149,15 @@ def edge_state(u: int, v: int, density_map: TrafficDensityMap) -> dict:
         congestion_ratio = occupancy / rho_max
     else:
         congestion_ratio = 0.0
+    if max_speed_ms is None:
+        max_speed_ms = 0.0
     return {
         'occupancy': occupancy,
         'background_occupancy': background_occupancy,
         'rho_max': rho_max,
         'congestion_ratio': congestion_ratio,
         'speed_ms': speed_ms,
+        "max_speed_ms": max_speed_ms,
         'length_m': length_m,
     }
 

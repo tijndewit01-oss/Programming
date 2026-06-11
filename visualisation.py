@@ -28,10 +28,10 @@ REPLAY_OUTPUT_PATH = os.path.join('OUTPUT Data Files', 'simulation_replay.html')
 FRAME_STEP_SECONDS = 60
 
 ROAD_BUCKETS = [
-    ('free', 'Free', 0.25, '#2ca25f', 2.5),
-    ('busy', 'Busy', 0.50, '#fdd835', 3.0),
-    ('congested', 'Congested', 0.75, '#fb8c00', 3.5),
-    ('jammed', 'Very congested', math.inf, '#d73027', 4.5),
+    ('free', 'Free', 0.25, '#2ca25f', 3.0),
+    ('busy', 'Busy', 0.50, '#fdd835', 4.0),
+    ('congested', 'Congested', 0.75, '#fb8c00', 5.5),
+    ('jammed', 'Very congested', math.inf, '#d73027', 8.0),
 ]
 
 QUEUE_ORDER = [
@@ -347,7 +347,8 @@ def build_road_snapshots(segment_log: pd.DataFrame, edge_lookup: dict[str, dict[
 def road_bucket_payloads(rows: pd.DataFrame, edge_lookup: dict[str, dict[str, Any]]) -> list[dict[str, list[float | None]]]:
     # Seed empty buckets with None so Plotly still shows every congestion
     # category in the legend before all categories appear in the animation.
-    payloads = [{'x': [None], 'y': [None]} for _ in ROAD_BUCKETS]
+    payloads = [{'x': [None], 'y': [None], 'hovertext': [None]} for _ in ROAD_BUCKETS]
+  
 
     for row in rows.itertuples(index=False):
         segment_id = str(getattr(row, 'segment_id', ''))
@@ -362,10 +363,13 @@ def road_bucket_payloads(rows: pd.DataFrame, edge_lookup: dict[str, dict[str, An
 
         ratio = safe_float(getattr(row, 'congestion_ratio', 0), default=0.0)
         bucket_index = road_bucket_index(ratio)
+        hover_string = f"Density: {row.occupancy:.2f}, Max Density: {row.rho_max:.2f}, Speed: {row.speed_ms * 3.6:.1f} kph, Max Speed: {row.max_speed_ms * 3.6:.1f} kph"
         payloads[bucket_index]['x'].extend(edge['x'])
         payloads[bucket_index]['y'].extend(edge['y'])
+        payloads[bucket_index]['hovertext'].extend(hover_string*len(edge['x']))
         payloads[bucket_index]['x'].append(None)
         payloads[bucket_index]['y'].append(None)
+        payloads[bucket_index]['hovertext'].append(None)
 
     return payloads
 
@@ -725,7 +729,8 @@ def create_replay_figure(
                 mode='lines',
                 name=label,
                 line={'color': color, 'width': width},
-                hoverinfo='skip',
+                hovertext= payload['hovertext'],
+                hovertemplate= '%{hovertext}<extra></extra>',
                 legendgroup='roads',
             ),
             row=1,
@@ -846,7 +851,7 @@ def build_frames(
 
         frame_data: list[Any] = []
         for payload in roads:
-            frame_data.append(go.Scatter(x=payload['x'], y=payload['y']))
+            frame_data.append(go.Scatter(x=payload['x'], y=payload['y'], hovertext=payload['hovertext']))
         frame_data.append(
             go.Scatter(
                 x=buses['x'],

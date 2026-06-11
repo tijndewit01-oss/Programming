@@ -33,4 +33,4 @@ nodes_dict = {
     "Parkinglot": ox.nearest_nodes(G, 6.273370, 52.384528),
 }
 print(nodes_dict)
-# ox.plot_graph(G, node_color=node_colors, node_size=30)
+ox.plot_graph(G, node_color=node_colors, node_size=30)

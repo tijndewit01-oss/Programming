@@ -28,7 +28,7 @@ RoadEdge = Tuple[NodeID, NodeID, Distance]
 # --- SIMULATION ---
 SIMULATION: Dict[str, Any] = {
 	# total number of visitors in the simulation
-	'NumberVisitors': 5100, #PLACEHOLDER
+	'NumberVisitors': 10000, #5100, #PLACEHOLDER
 
 	# event ending time in simulation time units (e.g., seconds)
     'EventStartTime': 64800, #18:00 in seconds
@@ -60,7 +60,7 @@ EMISSIONS: Dict[str, Any] = {
 # placeholders; actual network should be loaded from files into these fields
 ROAD_NETWORK: Dict[str, Any] = {
 
-    'StartNodes':  {'Node1': 46354890, 'Node2': 46336597, 'Node3': 3620826627, 'Node4': 46493064, 'Node5': 3611512307},
+    'StartNodes':  {'Node1': 46354890, 'Node2': 46336597, 'Node3': 46527746, 'Node4': 46493064, 'Node5': 3611512307},
     # Node3 is intentionally excluded until BUG #8 is fixed: it has no directed path to the parking lot.
     'CarStartNodeProb': {
         'Node1': 0.6142851757100457,
@@ -150,7 +150,7 @@ VISITOR_GENERATOR: Dict[str, Any] = {
 
 	# mode split fractions: share of visitors choosing each mode (sum to 1)
 	# e.g. {'car': 0.6, 'shuttle': 0.3, 'walk': 0.1}
-	'ModeSplit': {'car': 0.6, 'shuttle': 0.4},
+	'ModeSplit': {'car': 0.9, 'shuttle': 0.1},
     
 
 }

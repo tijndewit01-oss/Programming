@@ -35,7 +35,7 @@ class SimulationLogger:
         'segment_density_log.csv': [
             'run_id', 'sim_time', 'event_type', 'actor_type', 'actor_id',
             'u', 'v', 'segment_id', 'occupancy', 'background_occupancy',
-            'rho_max', 'congestion_ratio', 'speed_ms', 'length_m',
+            'rho_max', 'congestion_ratio', 'speed_ms', 'max_speed_ms', 'length_m',
         ],
         'queue_log.csv': [
             'run_id', 'sim_time', 'queue_name', 'location', 'length',
