@@ -71,10 +71,6 @@ class TrafficDensityMap:
         """
         return self._density.get((u, v), 0.0) + self._rho_background.get((u,v), 0.0)
 
-    def get_simulated_density(self, u: int, v: int) -> float:
-        """Return simulated vehicle occupancy on edge (u,v), excluding background traffic."""
-        return self._density.get((u, v), 0.0)
-
     def get_background_density(self, u: int, v: int) -> float:
         """Return background traffic occupancy on edge (u,v)."""
         return self._rho_background.get((u, v), 0.0)
@@ -162,20 +158,18 @@ def edge_state(u: int, v: int, density_map: TrafficDensityMap) -> dict:
     }
 
 
-def init_from_graph(G: nx.MultiDiGraph, density_map: "TrafficDensityMap | None" = None) -> TrafficDensityMap:
-    """Populate a TrafficDensityMap from an OSMnx graph.
+def init_from_graph(G: nx.MultiDiGraph, density_map: TrafficDensityMap) -> TrafficDensityMap:
+    """Populate the given TrafficDensityMap from an OSMnx graph and return it.
 
-    Each edge must have a 'rho_max' attribute (set by Prepare_network.py)
-    and a 'u_max_ms' attribute.
-    If density_map is None, the module-level traffic_density is used.
+    Each edge must carry a 'rho_max' and a 'u_max_ms' attribute (set by
+    Prepare_network.py); 'length' falls back to 0.0 if absent.
     """
-    target = density_map if density_map is not None else traffic_density
     for u, v, data in G.edges(data=True):
         rho_max = data.get('rho_max', float('inf'))
         u_max_ms = data.get('u_max_ms', config.TRAFFIC_MODEL['speed_fallback'] / 3.6) # default to fallback speed in m/s
         length = data.get('length', 0.0)
-        target.init_edge(u, v, rho_max, u_max_ms, length)
-    return target
+        density_map.init_edge(u, v, rho_max, u_max_ms, length)
+    return density_map
 
 
 
@@ -312,7 +306,3 @@ def background_density_update(env, G, density_map):
             if step <= 0:
                 break
             yield env.timeout(step)
-    
-
-# Module-level shared density map used across the simulation
-traffic_density = TrafficDensityMap()

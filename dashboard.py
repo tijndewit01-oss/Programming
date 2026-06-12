@@ -1,4 +1,10 @@
-"""Build the Prompt 4 analysis dashboard from simulation logs."""
+"""Build the static analysis dashboard (HTML) from the simulation log files.
+
+Reads the latest logged run from "OUTPUT Data Files/logs/" and renders a set of
+Plotly charts — scenario comparison, queue development, travel-time and journey
+phase breakdowns, road-congestion hotspots, and headline KPI cards — into one
+self-contained HTML file. Run after main.py:  python3 dashboard.py
+"""
 
 from __future__ import annotations
 
@@ -16,6 +22,7 @@ import plotly.io as pio
 from plotly.subplots import make_subplots
 
 import config
+from viz_utils import safe_float, seconds_to_clock
 
 
 LOG_DIR = config.LOGGING['OutputDir']
@@ -213,7 +220,6 @@ def create_dashboard(
         ('Visitor Arrival Funnel', figure_funnel_area(logs['funnel'], selected_summary)),
         ('Journey Phase Times', figure_phase_times(logs['visitors'], selected_summary)),
         ('Bus Utilisation', figure_bus_utilisation(logs['buses'])),
-        ('Visitor Flow Sankey', figure_sankey(logs['funnel'])),
         ('Road Congestion Hotspots', figure_congestion_hotspots(logs['segments'])),
         ('Visitor Generation Distribution', figure_visitor_generation(logs['visitors'])),
     ]
@@ -596,51 +602,6 @@ def figure_bus_utilisation(buses: pd.DataFrame) -> go.Figure:
         margin={'l': 70, 'r': 30, 't': 35, 'b': 55},
     )
     fig.update_xaxes(title_text='Trip number')
-    return fig
-
-
-def figure_sankey(funnel: pd.DataFrame) -> go.Figure:
-    if funnel.empty:
-        return blank_figure('Visitor Flow Sankey', 'No visitor funnel log available.')
-
-    transitions = Counter()
-    ordered = funnel.copy()
-    ordered['_order'] = range(len(ordered))
-    ordered = ordered.sort_values(['visitor_id', 'sim_time', '_order'], kind='mergesort')
-
-    for _, group in ordered.groupby('visitor_id', sort=False):
-        states = [str(state) for state in group['state'].tolist()]
-        compact_states = []
-        for state in states:
-            if not compact_states or compact_states[-1] != state:
-                compact_states.append(state)
-        for source, target in zip(compact_states[:-1], compact_states[1:]):
-            transitions[(source, target)] += 1
-
-    if not transitions:
-        return blank_figure('Visitor Flow Sankey', 'No state transitions available.')
-
-    labels = sorted({state for transition in transitions for state in transition}, key=state_sort_key)
-    label_index = {label: index for index, label in enumerate(labels)}
-    fig = go.Figure(
-        go.Sankey(
-            arrangement='snap',
-            node={
-                'label': [STATE_LABELS.get(label, label) for label in labels],
-                'pad': 14,
-                'thickness': 16,
-                'line': {'color': '#ffffff', 'width': 0.5},
-                'color': '#64748b',
-            },
-            link={
-                'source': [label_index[source] for source, _ in transitions],
-                'target': [label_index[target] for _, target in transitions],
-                'value': list(transitions.values()),
-                'color': 'rgba(37, 99, 235, 0.28)',
-            },
-        )
-    )
-    fig.update_layout(template='plotly_white', height=530, margin={'l': 20, 'r': 20, 't': 35, 'b': 35})
     return fig
 
 
@@ -1028,35 +989,9 @@ def configure_time_axis(fig: go.Figure, values: pd.Index | pd.Series | list[floa
         fig.update_xaxes(**axis_args, row=row, col=col)
 
 
-def state_sort_key(state: str) -> int:
-    try:
-        return STATE_ORDER.index(state)
-    except ValueError:
-        return len(STATE_ORDER)
-
-
-def safe_float(value: Any, default: float = math.nan) -> float:
-    try:
-        output = float(value)
-    except (TypeError, ValueError):
-        return default
-    if math.isnan(output):
-        return default
-    return output
-
-
 def seconds_to_minutes(value: Any) -> float:
     seconds = safe_float(value)
     return seconds / 60 if math.isfinite(seconds) else math.nan
-
-
-def seconds_to_clock(seconds: float) -> str:
-    if not math.isfinite(float(seconds)):
-        return ''
-    total = int(round(float(seconds)))
-    hours = (total // 3600) % 24
-    minutes = (total % 3600) // 60
-    return f'{hours:02d}:{minutes:02d}'
 
 
 def format_duration(value: Any) -> str:

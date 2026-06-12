@@ -1,7 +1,9 @@
-"""Generate replay-oriented visualisations from simulation log files.
+"""Build the interactive map replay (HTML) from the simulation log files.
 
-Prompt 3 scope: create a standalone interactive simulation replay, not the
-full scenario-analysis dashboard.
+Reads the latest logged run and renders a single self-contained Plotly figure:
+an animated map of Raalte where road segments are coloured by congestion and
+shuttle buses move along their routes, with side panels tracking queue lengths
+and visitor states over time. Run after main.py:  python3 visualisation.py
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 import config
+from viz_utils import safe_float, seconds_to_clock
 
 
 LOG_DIR = config.LOGGING['OutputDir']
@@ -1071,27 +1074,8 @@ def replay_title(run_id: str, summary: dict[str, Any], frame_time: float) -> str
     )
 
 
-def seconds_to_clock(seconds: float) -> str:
-    if not math.isfinite(float(seconds)):
-        return ''
-    total = int(round(float(seconds)))
-    hours = (total // 3600) % 24
-    minutes = (total % 3600) // 60
-    return f'{hours:02d}:{minutes:02d}'
-
-
 def format_count(value: float) -> str:
     return f'{float(value):,.0f}'
-
-
-def safe_float(value: Any, default: float = math.nan) -> float:
-    try:
-        output = float(value)
-    except (TypeError, ValueError):
-        return default
-    if math.isnan(output):
-        return default
-    return output
 
 
 def main() -> None:

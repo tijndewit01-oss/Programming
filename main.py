@@ -23,6 +23,7 @@ import networkx as nx
 
 import config
 from Functions.Trafficflowmodel import (
+    TrafficDensityMap,
     init_from_graph,
     shortest_path,
     background_density_update,
@@ -171,7 +172,7 @@ def main():
 
     # --- road network + shared traffic-density state ---
     G = load_graph()
-    density_map = init_from_graph(G)
+    density_map = init_from_graph(G, TrafficDensityMap())
 
     # --- init-time validation of entry-node data ---
     start_nodes = prepare_start_nodes(G, density_map)

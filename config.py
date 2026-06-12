@@ -13,7 +13,6 @@ Sections:
  - VISITOR_GENERATOR: visitor departure distribution & mode split
 
 Update values here or replace placeholders with real distribution objects.
-Call `init_runtime_objects()` at program start to create runtime-only objects.
 """
 
 from typing import Tuple, Dict, Any
@@ -144,20 +143,5 @@ VISITOR_GENERATOR: Dict[str, Any] = {
 
 	# mode split fractions: share of visitors choosing each mode (sum to 1)
 	'ModeSplit': {'car': 0.73, 'shuttle': 0.27},
-    
-}
 
-
-# Flat registry of sections for convenience
-ALL_SECTIONS: Dict[str, Dict[str, Any]] = {
-	'SIMULATION': SIMULATION,
-	'ROAD_NETWORK': ROAD_NETWORK,
-	'TRAFFIC_MODEL': TRAFFIC_MODEL,
-    'LOGGING': LOGGING,
-    'EMISSIONS': EMISSIONS,
-	'CAR': CAR,
-	'SHUTTLE_BUS': SHUTTLE_BUS,
-	'TICKET_SCAN': TICKET_SCAN,
-	'VISITOR': VISITOR,
-	'VISITOR_GENERATOR': VISITOR_GENERATOR,
 }
