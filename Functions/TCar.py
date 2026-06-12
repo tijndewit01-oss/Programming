@@ -73,24 +73,18 @@ class TCar:
             return
 
         depart_time = self.env.now
-        self.path = shortest_path(self.G, self.source, self.parking_lot_node, self.density_map)
+        self.path = shortest_path(self.G, self.source, self.parking_lot_node , self.density_map)
         route_length_m = sum(
             self.density_map.get_length(u, v) or 0
             for u, v in zip(self.path[:-1], self.path[1:])
         )
-
-        edges = list(zip(self.path[:-1], self.path[1:]))
-        for i, (u, v) in enumerate(edges):
-            is_last = (i == len(edges) - 1)
+        for u, v in zip(self.path[:-1], self.path[1:]):
             travel_time = edge_travel_time(u, v, self.density_map)
-            self.density_map.update_density(u, v, 1)  # Enter segment
+            self.density_map.update_density(u, v, 1) # Increment density for this edge
             self._log_segment('enter', u, v)
             yield self.env.timeout(travel_time)
-            if not is_last:
-                self.density_map.update_density(u, v, -1)  # Leave segment
-                self._log_segment('exit', u, v)
-            # Last segment is intentionally NOT decremented here: the car is now
-            # physically queued on the final road segment waiting to enter parking.
+            self.density_map.update_density(u, v, -1) # Decrement density after traversing
+            self._log_segment('exit', u, v)
 
         road_arrival_time = self.env.now
         parking_entry_request_time = self.env.now
@@ -98,11 +92,6 @@ class TCar:
             self._log_parking_queue('parking_entry_queue', len(self.parking_entry.queue), 'enqueue')
             yield entry_request
             parking_entry_start_time = self.env.now
-            # Admitted to an entry lane -> car pulls off the through road now.
-            if edges:
-                last_u, last_v = edges[-1]
-                self.density_map.update_density(last_u, last_v, -1)
-                self._log_segment('exit', last_u, last_v)
             self._log_parking_queue('parking_entry_queue', len(self.parking_entry.queue), 'dequeue')
             parking_entry_service = config.CAR['ParkingLotEntryDelay']()
             yield self.env.timeout(parking_entry_service)
@@ -134,9 +123,6 @@ class TCar:
 
         for visitor in self.passengers:
             visitor.reactivate()
-
-
-
 
     def _log_queue(self, length, event_type, visitor_id):
         if not self.logger:
