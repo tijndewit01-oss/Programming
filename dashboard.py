@@ -124,7 +124,7 @@ def load_run_logs(log_dir: str, run_id: str) -> dict[str, pd.DataFrame]:
             [
                 'run_id', 'sim_time', 'event_type', 'actor_type', 'segment_id',
                 'occupancy', 'background_occupancy', 'rho_max',
-                'congestion_ratio', 'speed_ms', 'length_m',
+                'congestion_ratio', 'speed_ms', 'max_speed_ms', 'length_m',
             ],
         ),
     }
@@ -215,6 +215,7 @@ def create_dashboard(
         ('Bus Utilisation', figure_bus_utilisation(logs['buses'])),
         ('Visitor Flow Sankey', figure_sankey(logs['funnel'])),
         ('Road Congestion Hotspots', figure_congestion_hotspots(logs['segments'])),
+        ('Visitor Generation Distribution', figure_visitor_generation(logs['visitors'])),
     ]
 
     html_output = render_html(
@@ -224,7 +225,7 @@ def create_dashboard(
         figures=figures,
     )
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, 'w') as f:
+    with open(output_path, 'w', encoding='utf-8') as f:
         f.write(html_output)
     return output_path
 
@@ -685,6 +686,70 @@ def figure_congestion_hotspots(segments: pd.DataFrame) -> go.Figure:
     fig.update_xaxes(title_text='Max congestion ratio', rangemode='tozero')
     return fig
 
+def figure_visitor_generation(visitors):
+    visitor_in_system = visitors['depart_time']
+    if visitor_in_system.empty:
+        return blank_figure('Visitor Start Time Distribution', 'No completed visitor start times available.')
+
+    sorted_visitors = visitor_in_system.sort_values()
+    cdf = pd.Series(range(1, len(sorted_visitors) + 1), index=sorted_visitors.index) / len(sorted_visitors) * 100
+
+
+    fig = make_subplots(specs=[[{'secondary_y': True}]])
+    fig.add_trace(
+        go.Histogram(
+            x=sorted_visitors,
+            nbinsx=45,
+            name='Visitors Generated',
+            marker_color='#2563eb',
+            opacity=0.78,
+            hovertemplate='%{x:.1f} min<br>%{y} visitors<extra></extra>',
+        ),
+        secondary_y=False,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=sorted_visitors,
+            y=cdf,
+            mode='lines',
+            name='CDF',
+            line={'color': '#dc2626', 'width': 3},
+            hovertemplate='%{x:.1f} min<br>%{y:.1f}% complete<extra></extra>',
+        ),
+        secondary_y=True,
+    )
+
+    mean_value = visitor_in_system.mean()
+    median_value = visitor_in_system.median()
+    fig.add_vline(x=mean_value, line_color='#0f766e', line_dash='dash')
+    fig.add_vline(x=median_value, line_color='#7c3aed', line_dash='dot')
+    fig.add_annotation(
+        x=mean_value,
+        y=0.96,
+        yref='paper',
+        text=f'Mean {seconds_to_clock(mean_value)}',
+        showarrow=False,
+        font={'color': '#0f766e'},
+    )
+    fig.add_annotation(
+        x=median_value,
+        y=0.88,
+        yref='paper',
+        text=f'Median {seconds_to_clock(median_value)}',
+        showarrow=False,
+        font={'color': '#7c3aed'},
+    )
+    fig.update_layout(
+        template='plotly_white',
+        height=460,
+        bargap=0.05,
+        margin={'l': 55, 'r': 55, 't': 45, 'b': 55},
+        legend={'orientation': 'h', 'y': 1.10},
+    )
+    configure_time_axis(fig, sorted_visitors)
+    fig.update_yaxes(title_text='Visitors', secondary_y=False)
+    fig.update_yaxes(title_text='Cumulative %', range=[0, 100], secondary_y=True)
+    return fig
 
 def completed_travel_minutes(visitors: pd.DataFrame) -> pd.Series:
     if visitors.empty:

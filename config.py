@@ -28,10 +28,10 @@ RoadEdge = Tuple[NodeID, NodeID, Distance]
 # --- SIMULATION ---
 SIMULATION: Dict[str, Any] = {
 	# total number of visitors in the simulation
-	'NumberVisitors': 10000, #5100, #PLACEHOLDER
+	'NumberVisitors': 10000, #5100,
 
 	# event ending time in simulation time units (e.g., seconds)
-    'EventStartTime': 64800, #18:00 in seconds
+    'EventStartTime': 63000, #17:30 in seconds
 	'EventEndingTime': 86400, #24:00 in seconds (Saturday)
 
 	# time unit description (for documentation only)
@@ -74,7 +74,7 @@ ROAD_NETWORK: Dict[str, Any] = {
 
     'Interpolate': 1200, #Seconds (must be a whole minute) of interpolation time 
     					#for the traffic density update (so time before + after hour change)
-    'N_local': 0.2 #Conversion of flow rate from N roads and local in percentage
+    'N_local': 0.5 #Conversion of flow rate from N roads and local in percentage
 }
 
 
@@ -84,7 +84,7 @@ TRAFFIC_MODEL: Dict[str, Any] = {
 	'speed_fallback': 30.0, #In case the osm had no speed limit, default to 30 kph (8.33 m/s)
 
 	# minimum speed used when an edge is at/above jam occupancy
-	'min_crawl_speed_kph': 5.0,
+	'min_crawl_speed_ms': 0.1,
 
 	# average space one car occupies on the road (bumper-to-bumper, meters)
 	'Car_Spacing': 7.5,
@@ -94,36 +94,30 @@ TRAFFIC_MODEL: Dict[str, Any] = {
 # --- CAR ---
 CAR: Dict[str, Any] = {
 	# time (seconds) to find a parking space after passing the parking entrance
-	'FindSpaceParkCar': 180,
+	'FindSpaceParkCar': 60,
 
 	# number of parallel parking entrance lanes and service time per car
-	'ParkingLotEntryLanes': 3,
-	'ParkingLotEntryDelay': lambda: 10.0,
+	'ParkingLotEntryLanes': 2,
+	'ParkingLotEntryDelay': lambda: 7.0,
 
 	# maximum wait time (seconds) a car will tolerate (e.g., at entry)
 	'MaxWaitTime': 180, # s, PLACEHOLDER
 
-	# {'dist': 'poisson', 'lambda': 2} or {'dist': 'custom', 'params': {...}}
-	'CarCapacityDistribution': {'dist': 'equal', 'low': 1, 'high': 3}, #PLACEHOLDER
+	# Uniform distribution
+	'CarCapacityDistribution': {'dist': 'equal', 'low': 1, 'high': 4}, 
 }
 
-
-# --- CAR_GENERATOR ---
-CAR_GENERATOR: Dict[str, Any] = {
-	# parameters describing the car capacity distribution. Example format: PLACEHOLDER; replace with real distribution parameters or objects    
-	#Car timeout time
-}
 
 
 # --- SHUTTLE_BUS ---
 SHUTTLE_BUS: Dict[str, Any] = {
-	'n_buses': 2,
+	'n_buses': 4,
 	'capacity': 40, # typical full-size shuttle bus capacity
 	'MaxWaitTime': 600,  # Seconds
 	'BoardingTimePerPassenger': 2, # Seconds
 	'AlightingTimePerPassenger': 2, # Seconds
 	# passenger car equivalents for buses (how many cars a bus counts as)
-	'bus_equivalent': 3, #PLACEHOLDER, Check literature
+	'bus_equivalent': 3, 
 }
 
 
@@ -137,22 +131,20 @@ TICKET_SCAN: Dict[str, Any] = {
 # --- VISITOR ---
 VISITOR: Dict[str, Any] = {
     'VisitorWalkSpeed': 1.4, # m/s
-	'Dist_WalkToShuttlebus': 300, # m, PLACEHOLDER, check route
-	'Dist_WalkToTicketScan': 120, # m, PLACEHOLDER, check route
+	'Dist_WalkToShuttlebus': 200, # m
+	'Dist_WalkToTicketScan': 100, # m
 }
 
 
 # --- VISITOR_GENERATOR ---
 VISITOR_GENERATOR: Dict[str, Any] = {
-	# inter-departure distribution parameters (example): PLACEHOLDER; replace with real distribution parameters or objects
+	# inter-departure distribution parameters
 	# {'dist': 'exponential', 'rate': 0.01}
-	'InterDepartDistributionParams': {'dist': 'gamma', 'kappa' : 1.4593, 'theta': 4606.5, 'shift': 66271.6}, 
+	'InterDepartDistributionParams': {'dist': 'gamma', 'kappa' : 1.4593, 'theta': 4606.5, 'shift': 66271.6 - 45*60}, #shifting by average travel time
 
 	# mode split fractions: share of visitors choosing each mode (sum to 1)
-	# e.g. {'car': 0.6, 'shuttle': 0.3, 'walk': 0.1}
-	'ModeSplit': {'car': 0.9, 'shuttle': 0.1},
+	'ModeSplit': {'car': 0.73, 'shuttle': 0.27},
     
-
 }
 
 
@@ -164,7 +156,6 @@ ALL_SECTIONS: Dict[str, Dict[str, Any]] = {
     'LOGGING': LOGGING,
     'EMISSIONS': EMISSIONS,
 	'CAR': CAR,
-	'CAR_GENERATOR': CAR_GENERATOR,
 	'SHUTTLE_BUS': SHUTTLE_BUS,
 	'TICKET_SCAN': TICKET_SCAN,
 	'VISITOR': VISITOR,

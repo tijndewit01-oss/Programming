@@ -109,7 +109,7 @@ def greenshields_speed(rho: float, rho_max: float, u_max_ms: float) -> float:
         return 0.0
     rho_clamped = min(max(rho, 0.0), rho_max)
     model_speed = u_max_ms * (1.0 - rho_clamped / rho_max)
-    min_crawl_speed = config.TRAFFIC_MODEL['min_crawl_speed_kph'] / 3.6
+    min_crawl_speed = config.TRAFFIC_MODEL['min_crawl_speed_ms']
     return max(model_speed, min_crawl_speed)
 
 

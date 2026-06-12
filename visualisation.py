@@ -25,7 +25,7 @@ LOG_DIR = config.LOGGING['OutputDir']
 NETWORK_PATH = os.path.join('INPUT_Data_Files', 'network.pkl')
 REPLAY_OUTPUT_PATH = os.path.join('OUTPUT Data Files', 'simulation_replay.html')
 
-FRAME_STEP_SECONDS = 60
+FRAME_STEP_SECONDS = 15
 
 ROAD_BUCKETS = [
     ('free', 'Free', 0.25, '#2ca25f', 3.0),
@@ -363,7 +363,7 @@ def road_bucket_payloads(rows: pd.DataFrame, edge_lookup: dict[str, dict[str, An
 
         ratio = safe_float(getattr(row, 'congestion_ratio', 0), default=0.0)
         bucket_index = road_bucket_index(ratio)
-        hover_string = f"Density: {row.occupancy:.2f}, Max Density: {row.rho_max:.2f}, Speed: {row.speed_ms * 3.6:.1f} kph, Max Speed: {row.max_speed_ms * 3.6:.1f} kph, Number of cars: {int(row.occupancy * row.length_m)}"
+        hover_string = f"Density (Cars): {row.occupancy:.2f}, Max Density: {row.rho_max:.2f}, Speed: {row.speed_ms * 3.6:.1f} kph"
         payloads[bucket_index]['x'].extend(edge['x'])
         payloads[bucket_index]['y'].extend(edge['y'])
         payloads[bucket_index]['hovertext'].extend([hover_string] *len(edge['x']))
@@ -945,7 +945,20 @@ def configure_layout(
                         'args': [
                             None,
                             {
-                                'frame': {'duration': 220, 'redraw': True},
+                                'frame': {'duration': 200, 'redraw': True},
+                                'transition': {'duration': 0},
+                                'fromcurrent': True,
+                                'mode': 'immediate',
+                            },
+                        ],
+                    },
+                    {
+                        'label': 'Play 2x',
+                        'method': 'animate',
+                        'args': [
+                            None,
+                            {
+                                'frame': {'duration': 100, 'redraw': True},
                                 'transition': {'duration': 0},
                                 'fromcurrent': True,
                                 'mode': 'immediate',
