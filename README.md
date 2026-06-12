@@ -17,15 +17,12 @@ elasticities — is **not** implemented: the split is a fixed fraction in `confi
 # 1. Run the simulation -> writes log files under "OUTPUT Data Files/logs/"
 python3 main.py
 
-# 2. Build the analysis dashboard (static charts) from the latest run
+# 2. Build the analysis dashboard (KPI charts + congestion map) from the latest run
 python3 dashboard.py            # -> OUTPUT Data Files/simulation_dashboard.html
-
-# 3. Build the animated map replay from the latest run
-python3 visualisation.py        # -> OUTPUT Data Files/simulation_replay.html
 ```
 
-Open the generated `.html` files in a browser. Both viz scripts read the most recent
-run from the log directory; `dashboard.py` also accepts `--run-id` / `--log-dir`.
+Open the generated `.html` file in a browser. `dashboard.py` reads the most recent
+run from the log directory and also accepts `--run-id` / `--log-dir`.
 
 **Dependencies:** `simpy`, `networkx`, `pandas`, `plotly`, `scipy`, `numpy`.
 (`osmnx` is only needed by the one-time data-prep scripts, not to run the simulation.)
@@ -51,10 +48,9 @@ config.py  ──parameters──►  main.py  (wires the SimPy environment)
                                │
                          SimulationLogger  ──► CSV + JSONL logs in OUTPUT Data Files/logs/
                                │
-                ┌──────────────┴───────────────┐
-                ▼                               ▼
-          dashboard.py                    visualisation.py
-       (KPI charts → HTML)          (animated congestion map → HTML)
+                               ▼
+                          dashboard.py
+        (KPI charts + static road-congestion map → one HTML file)
 ```
 
 `Trafficflowmodel.py` provides the shared road state: a `TrafficDensityMap` (vehicle
@@ -75,9 +71,7 @@ shortest-path routing, and the real-world background-traffic process.
 | `Functions/TTicketScan.py` | The final ticket-scan stage where all visitors converge. |
 | `Functions/Trafficflowmodel.py` | Road density state, Greenshields travel-time, routing, background traffic. |
 | `Functions/SimulationLogger.py` | Collects rows in memory and writes the CSV / JSONL log files. |
-| `dashboard.py` | Builds the static analysis dashboard (KPIs, queues, congestion, etc.). |
-| `visualisation.py` | Builds the interactive animated map replay. |
-| `viz_utils.py` | Small formatting helpers shared by the two viz scripts. |
+| `dashboard.py` | Builds the whole analysis dashboard: KPI cards, scenario comparison, queues, travel/phase times, bus use, and a static road-congestion map. |
 | `INPUT_Data_Files/` | Prepared inputs + one-time prep scripts (see below). |
 | `OUTPUT Data Files/` | Generated logs and HTML outputs. |
 | `TASKLIST` | Development notes, fixed-bug log, and remaining work. |

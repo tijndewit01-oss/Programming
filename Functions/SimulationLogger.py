@@ -17,9 +17,6 @@ class SimulationLogger:
             'waiting_bus_time', 'waiting_ticket_time', 'in_car_time',
             'in_bus_time', 'parking_time', 'scanning_time',
         ],
-        'arrival_funnel_log.csv': [
-            'run_id', 'visitor_id', 'sim_time', 'state', 'mode', 'location',
-        ],
         'car_log.csv': [
             'run_id', 'car_id', 'source_node', 'capacity', 'passenger_count',
             'depart_time', 'road_arrival_time', 'parked_time', 'drive_time',
@@ -103,19 +100,29 @@ class SimulationLogger:
             'in_bus_time': 0.0,
             'parking_time': 0.0,
             'scanning_time': 0.0,
+            # Bookkeeping for incremental phase-duration accumulation (ignored on CSV write).
+            '_cur_state': None,
+            '_cur_start': None,
         }
 
     def log_visitor_state(self, visitor_id, sim_time, state, mode='', location=''):
-        if visitor_id in self._visitors:
-            self._visitors[visitor_id]['final_state'] = state
-        self._rows['arrival_funnel_log.csv'].append({
-            'run_id': self.run_id,
-            'visitor_id': visitor_id,
-            'sim_time': sim_time,
-            'state': state,
-            'mode': mode,
-            'location': location,
-        })
+        """Record a visitor state change and accumulate the time spent in the prior state.
+
+        Phase durations are summed incrementally here (instead of replaying a full
+        per-event log later), so no separate arrival-funnel file needs to be written.
+        """
+        visitor = self._visitors.get(visitor_id)
+        if visitor is None:
+            return
+        sim_time = float(sim_time)
+        prev_state = visitor['_cur_state']
+        if prev_state is not None:
+            column = self.STATE_DURATION_MAP.get(prev_state)
+            if column:
+                visitor[column] += max(0.0, sim_time - float(visitor['_cur_start']))
+        visitor['_cur_state'] = state
+        visitor['_cur_start'] = sim_time
+        visitor['final_state'] = state
 
     def complete_visitor(self, visitor_id, arrival_time):
         if visitor_id not in self._visitors:
@@ -230,33 +237,23 @@ class SimulationLogger:
                 f.write(json.dumps(summary, sort_keys=True) + '\n')
 
     def _finalize_visitors(self):
-        events_by_visitor = {}
-        for row in self._rows['arrival_funnel_log.csv']:
-            events_by_visitor.setdefault(row['visitor_id'], []).append(row)
+        """Close out each visitor's still-open final state and set total_time.
 
-        for visitor_id, visitor in self._visitors.items():
-            for column in self.PHASE_COLUMNS:
-                visitor[column] = 0.0
-
-            events = sorted(
-                events_by_visitor.get(visitor_id, []),
-                key=lambda row: float(row['sim_time']),
-            )
-            for index, event in enumerate(events):
-                state = event['state']
-                column = self.STATE_DURATION_MAP.get(state)
-                if not column:
-                    continue
-                start = float(event['sim_time'])
-                if index + 1 < len(events):
-                    end = float(events[index + 1]['sim_time'])
-                else:
-                    end = self._visitor_end_time(visitor)
-                visitor[column] += max(0.0, end - start)
-
+        Phase columns are accumulated live in log_visitor_state; here we just add
+        the time spent in the last (still-open) state up to the visitor's end time.
+        Idempotent: _cur_state is cleared so a second call cannot double-count.
+        """
+        for visitor in self._visitors.values():
             end_time = self._visitor_end_time(visitor)
+            cur_state = visitor['_cur_state']
+            if cur_state is not None and end_time != '':
+                column = self.STATE_DURATION_MAP.get(cur_state)
+                if column:
+                    visitor[column] += max(0.0, float(end_time) - float(visitor['_cur_start']))
+                visitor['_cur_state'] = None
+                visitor['_cur_start'] = None
             if end_time != '':
-                visitor['total_time'] = max(0.0, end_time - float(visitor['depart_time']))
+                visitor['total_time'] = max(0.0, float(end_time) - float(visitor['depart_time']))
 
     def _visitor_end_time(self, visitor):
         if visitor['arrival_time'] != '':

@@ -2,7 +2,7 @@
 
 Reads the latest logged run from "OUTPUT Data Files/logs/" and renders a set of
 Plotly charts — scenario comparison, queue development, travel-time and journey
-phase breakdowns, road-congestion hotspots, and headline KPI cards — into one
+phase breakdowns, a road-congestion map, and headline KPI cards — into one
 self-contained HTML file. Run after main.py:  python3 dashboard.py
 """
 
@@ -13,7 +13,7 @@ import html
 import json
 import math
 import os
-from collections import Counter
+import pickle
 from typing import Any
 
 import pandas as pd
@@ -22,11 +22,40 @@ import plotly.io as pio
 from plotly.subplots import make_subplots
 
 import config
-from viz_utils import safe_float, seconds_to_clock
 
 
 LOG_DIR = config.LOGGING['OutputDir']
+NETWORK_PATH = os.path.join('INPUT_Data_Files', 'network.pkl')
 DASHBOARD_OUTPUT_PATH = os.path.join('OUTPUT Data Files', 'simulation_dashboard.html')
+
+# Congestion colour scale for the road map: (label, upper congestion-ratio bound, colour).
+ROAD_BUCKETS = [
+    ('Free flowing', 0.25, '#2ca25f'),
+    ('Busy', 0.50, '#fdd835'),
+    ('Congested', 0.75, '#fb8c00'),
+    ('Very congested', math.inf, '#d73027'),
+]
+
+
+def safe_float(value: Any, default: float = math.nan) -> float:
+    """Coerce a value to float, returning `default` for None/blank/NaN inputs."""
+    try:
+        output = float(value)
+    except (TypeError, ValueError):
+        return default
+    if math.isnan(output):
+        return default
+    return output
+
+
+def seconds_to_clock(seconds: float) -> str:
+    """Format a simulation time (seconds since midnight) as a 'HH:MM' clock string."""
+    if not math.isfinite(float(seconds)):
+        return ''
+    total = int(round(float(seconds)))
+    hours = (total // 3600) % 24
+    minutes = (total % 3600) // 60
+    return f'{hours:02d}:{minutes:02d}'
 
 QUEUE_LABELS = {
     'shuttle_bus_queue': 'Shuttle queue',
@@ -35,23 +64,6 @@ QUEUE_LABELS = {
     'car_queues_total': 'Car pickup queues',
     'parking_lot_occupancy': 'Parked cars',
 }
-
-STATE_LABELS = {
-    'not_started': 'Not started',
-    'generated': 'Generated',
-    'walking_to_bus': 'Walking to bus',
-    'waiting_bus': 'Waiting bus',
-    'in_bus': 'In bus',
-    'waiting_car': 'Waiting car',
-    'in_car': 'In car',
-    'parking': 'Parking',
-    'walking_ticket': 'Walking ticket',
-    'waiting_ticket': 'Waiting ticket',
-    'scanning': 'Scanning',
-    'scanned': 'Scanned',
-}
-
-STATE_ORDER = list(STATE_LABELS)
 
 PHASE_LABELS = {
     'walking_time': 'Walking',
@@ -117,12 +129,6 @@ def load_run_logs(log_dir: str, run_id: str) -> dict[str, pd.DataFrame]:
                 'load_factor', 'station_queue_left', 'outbound_drive_time',
                 'return_drive_time', 'outbound_distance_m', 'return_distance_m',
             ],
-        ),
-        'funnel': read_run_csv(
-            log_dir,
-            'arrival_funnel_log.csv',
-            run_id,
-            ['run_id', 'visitor_id', 'sim_time', 'state', 'mode', 'location'],
         ),
         'segments': read_run_csv(
             log_dir,
@@ -217,10 +223,9 @@ def create_dashboard(
         ('Scenario Summary Table', figure_scenario_table(scenario_df)),
         ('Travel Time Distribution', figure_travel_time_distribution(logs['visitors'])),
         ('Queue Development', figure_queue_timeseries(logs['queues'])),
-        ('Visitor Arrival Funnel', figure_funnel_area(logs['funnel'], selected_summary)),
         ('Journey Phase Times', figure_phase_times(logs['visitors'], selected_summary)),
         ('Bus Utilisation', figure_bus_utilisation(logs['buses'])),
-        ('Road Congestion Hotspots', figure_congestion_hotspots(logs['segments'])),
+        ('Road Congestion Map', figure_congestion_map(logs['segments'])),
         ('Visitor Generation Distribution', figure_visitor_generation(logs['visitors'])),
     ]
 
@@ -497,53 +502,6 @@ def figure_queue_timeseries(queues: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def figure_funnel_area(funnel: pd.DataFrame, summary: dict[str, Any]) -> go.Figure:
-    states = state_counts_over_time(funnel, summary)
-    if states.empty:
-        return blank_figure('Visitor Arrival Funnel', 'No visitor state log available.')
-
-    fig = go.Figure()
-    colors = {
-        'not_started': '#d1d5db',
-        'generated': '#64748b',
-        'walking_to_bus': '#38bdf8',
-        'waiting_bus': '#2563eb',
-        'in_bus': '#1d4ed8',
-        'waiting_car': '#c084fc',
-        'in_car': '#7c3aed',
-        'parking': '#10b981',
-        'walking_ticket': '#f59e0b',
-        'waiting_ticket': '#dc2626',
-        'scanning': '#991b1b',
-        'scanned': '#16a34a',
-    }
-
-    for state in STATE_ORDER:
-        if state not in states.columns:
-            continue
-        fig.add_trace(
-            go.Scatter(
-                x=states.index,
-                y=states[state],
-                mode='lines',
-                name=STATE_LABELS[state],
-                stackgroup='one',
-                line={'width': 0.8, 'color': colors[state]},
-                hovertemplate=f'{STATE_LABELS[state]}: %{{y:.0f}}<extra></extra>',
-            )
-        )
-
-    fig.update_layout(
-        template='plotly_white',
-        height=520,
-        margin={'l': 55, 'r': 25, 't': 45, 'b': 80},
-        legend={'orientation': 'h', 'y': -0.18},
-    )
-    configure_time_axis(fig, states.index)
-    fig.update_yaxes(title_text='Visitors', rangemode='tozero')
-    return fig
-
-
 def figure_phase_times(visitors: pd.DataFrame, summary: dict[str, Any]) -> go.Figure:
     values = average_phase_minutes(visitors, summary)
     if not values:
@@ -605,47 +563,123 @@ def figure_bus_utilisation(buses: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def figure_congestion_hotspots(segments: pd.DataFrame) -> go.Figure:
+def load_network_geometry(network_path: str = NETWORK_PATH):
+    """Load road geometry from network.pkl for the congestion map.
+
+    Returns (edge_coords, node_lookup):
+      edge_coords: {segment_id 'u->v' -> [(lon, lat), ...]}
+      node_lookup: {node_id -> (lon, lat)}
+    """
+    with open(network_path, 'rb') as f:
+        graph = pickle.load(f)
+    node_lookup = {
+        int(node): (float(data['x']), float(data['y']))
+        for node, data in graph.nodes(data=True)
+        if 'x' in data and 'y' in data
+    }
+    edge_coords: dict[str, list[tuple[float, float]]] = {}
+    for u, v, data in graph.edges(data=True):
+        geometry = data.get('geometry')
+        if geometry is not None and hasattr(geometry, 'coords'):
+            coords = [(float(x), float(y)) for x, y in geometry.coords]
+        elif int(u) in node_lookup and int(v) in node_lookup:
+            coords = [node_lookup[int(u)], node_lookup[int(v)]]
+        else:
+            continue
+        edge_coords[f'{int(u)}->{int(v)}'] = coords
+    return edge_coords, node_lookup
+
+
+def road_bucket_index(congestion_ratio: float) -> int:
+    """Map a congestion ratio to its colour-bucket index in ROAD_BUCKETS."""
+    for index, (_, upper_bound, _) in enumerate(ROAD_BUCKETS):
+        if congestion_ratio <= upper_bound:
+            return index
+    return len(ROAD_BUCKETS) - 1
+
+
+def figure_congestion_map(segments: pd.DataFrame) -> go.Figure:
+    """Static map of Raalte's roads, each segment coloured by its peak congestion.
+
+    Replaces the old animated replay with one polyline trace per congestion bucket,
+    plus markers for the car entry nodes, the station/shuttle stop, and the parking
+    lot. Peak congestion is taken over the periodic segment snapshots.
+    """
+    try:
+        edge_coords, node_lookup = load_network_geometry()
+    except (FileNotFoundError, OSError):
+        return blank_figure('Road Congestion Map', 'Road network file not found.')
+
     if segments.empty or 'congestion_ratio' not in segments:
-        return blank_figure('Road Congestion Hotspots', 'No segment density log available.')
+        return blank_figure('Road Congestion Map', 'No segment density log available.')
 
-    source = segments[segments['event_type'] == 'snapshot'].copy()
+    source = segments[segments['event_type'] == 'snapshot']
     if source.empty:
-        source = segments.copy()
-    source = source.dropna(subset=['segment_id', 'congestion_ratio'])
-    if source.empty:
-        return blank_figure('Road Congestion Hotspots', 'No congestion ratios available.')
-
-    grouped = (
-        source.groupby('segment_id')
-        .agg(max_congestion=('congestion_ratio', 'max'), avg_speed_ms=('speed_ms', 'mean'))
-        .sort_values('max_congestion', ascending=False)
-        .head(15)
-        .sort_values('max_congestion')
+        source = segments
+    peak = (
+        source.dropna(subset=['segment_id', 'congestion_ratio'])
+        .groupby('segment_id')['congestion_ratio']
+        .max()
     )
+    if peak.empty:
+        return blank_figure('Road Congestion Map', 'No congestion ratios available.')
 
-    fig = go.Figure(
-        go.Bar(
-            x=grouped['max_congestion'],
-            y=grouped.index,
-            orientation='h',
-            marker_color=[
-                '#16a34a' if value < 0.5 else '#f59e0b' if value < 0.85 else '#dc2626'
-                for value in grouped['max_congestion']
-            ],
-            text=[format_number(value, 2) for value in grouped['max_congestion']],
-            textposition='outside',
-            hovertemplate='Max congestion %{x:.2f}<br>%{y}<extra></extra>',
-        )
-    )
-    fig.add_vline(x=1.0, line_dash='dash', line_color='#111827')
+    # One polyline trace per congestion bucket; None entries break the line between segments.
+    bucket_x: list[list] = [[] for _ in ROAD_BUCKETS]
+    bucket_y: list[list] = [[] for _ in ROAD_BUCKETS]
+    bucket_text: list[list] = [[] for _ in ROAD_BUCKETS]
+    for segment_id, ratio in peak.items():
+        coords = edge_coords.get(str(segment_id))
+        if not coords:
+            continue
+        index = road_bucket_index(safe_float(ratio, 0.0))
+        label = f'{segment_id}<br>peak congestion {ratio:.2f}'
+        for lon, lat in coords:
+            bucket_x[index].append(lon)
+            bucket_y[index].append(lat)
+            bucket_text[index].append(label)
+        bucket_x[index].append(None)
+        bucket_y[index].append(None)
+        bucket_text[index].append(None)
+
+    fig = go.Figure()
+    for index, (name, _, color) in enumerate(ROAD_BUCKETS):
+        fig.add_trace(go.Scatter(
+            x=bucket_x[index] or [None],
+            y=bucket_y[index] or [None],
+            mode='lines',
+            line={'color': color, 'width': 3},
+            name=name,
+            hoverinfo='text',
+            text=bucket_text[index] or [None],
+            connectgaps=False,
+        ))
+
+    # Markers for the key locations.
+    markers = [(f'Car entry {name}', node_id, '#8b5cf6', 'circle')
+               for name, node_id in config.ROAD_NETWORK['StartNodes'].items()]
+    markers.append(('Train station / shuttle stop', config.ROAD_NETWORK['Bus_start'], '#0ea5e9', 'diamond'))
+    markers.append(('Car parking / festival', config.ROAD_NETWORK['Parkinglot'], '#dc2626', 'star'))
+    for label, node_id, color, symbol in markers:
+        point = node_lookup.get(int(node_id))
+        if not point:
+            continue
+        fig.add_trace(go.Scatter(
+            x=[point[0]], y=[point[1]], mode='markers',
+            marker={'color': color, 'size': 12, 'symbol': symbol, 'line': {'color': 'white', 'width': 1}},
+            name=label, hoverinfo='text', text=[label],
+        ))
+
     fig.update_layout(
         template='plotly_white',
-        height=500,
-        margin={'l': 150, 'r': 45, 't': 35, 'b': 45},
+        height=620,
+        margin={'l': 30, 'r': 30, 't': 35, 'b': 30},
+        legend={'orientation': 'h', 'yanchor': 'bottom', 'y': 1.01},
     )
-    fig.update_xaxes(title_text='Max congestion ratio', rangemode='tozero')
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
     return fig
+
 
 def figure_visitor_generation(visitors):
     visitor_in_system = visitors['depart_time']
@@ -742,41 +776,6 @@ def queue_snapshot_pivot(queues: pd.DataFrame) -> pd.DataFrame:
 
     selected = [name for name in QUEUE_LABELS if name in pivot.columns]
     return pivot[selected]
-
-
-def state_counts_over_time(funnel: pd.DataFrame, summary: dict[str, Any], step_seconds: int = 300) -> pd.DataFrame:
-    if funnel.empty:
-        return pd.DataFrame()
-
-    total_visitors = int(summary.get('visitors_generated') or summary.get('number_visitors_config') or funnel['visitor_id'].nunique())
-    events = funnel.copy().reset_index(drop=True)
-    events['_order'] = range(len(events))
-    events = events.dropna(subset=['sim_time', 'visitor_id', 'state'])
-    events = events.sort_values(['sim_time', '_order'], kind='mergesort')
-    if events.empty:
-        return pd.DataFrame()
-
-    start = int(math.floor(float(events['sim_time'].min()) / step_seconds) * step_seconds)
-    event_end = summary.get('finished_at') or summary.get('event_ending_time') or events['sim_time'].max()
-    end = int(math.ceil(float(event_end) / step_seconds) * step_seconds)
-    frame_times = list(range(start, end + 1, step_seconds))
-
-    visitor_states: dict[Any, str] = {}
-    rows = list(events[['sim_time', 'visitor_id', 'state']].itertuples(index=False, name=None))
-    row_index = 0
-    output_rows = []
-
-    for frame_time in frame_times:
-        while row_index < len(rows) and float(rows[row_index][0]) <= frame_time:
-            _, visitor_id, state = rows[row_index]
-            visitor_states[visitor_id] = str(state)
-            row_index += 1
-
-        counts = Counter(visitor_states.values())
-        counts['not_started'] = max(0, total_visitors - len(visitor_states))
-        output_rows.append({state: int(counts.get(state, 0)) for state in STATE_ORDER})
-
-    return pd.DataFrame(output_rows, index=pd.Index(frame_times, name='sim_time'))
 
 
 def average_phase_minutes(visitors: pd.DataFrame, summary: dict[str, Any]) -> dict[str, float]:

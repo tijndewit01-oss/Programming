@@ -1,6 +1,6 @@
 #The TCar class
 import numpy as np
-from Functions.Trafficflowmodel import shortest_path, edge_travel_time, edge_state
+from Functions.Trafficflowmodel import shortest_path, edge_travel_time
 import config
 
 
@@ -84,11 +84,9 @@ class TCar:
             is_last = (i == len(edges) - 1)
             travel_time = edge_travel_time(u, v, self.density_map)
             self.density_map.update_density(u, v, 1)  # Enter segment
-            self._log_segment('enter', u, v)
             yield self.env.timeout(travel_time)
             if not is_last:
                 self.density_map.update_density(u, v, -1)  # Leave segment
-                self._log_segment('exit', u, v)
             # Last segment is intentionally NOT decremented here: the car is now
             # physically queued on the final road segment waiting to enter parking.
 
@@ -102,7 +100,6 @@ class TCar:
             if edges:
                 last_u, last_v = edges[-1]
                 self.density_map.update_density(last_u, last_v, -1)
-                self._log_segment('exit', last_u, last_v)
             self._log_parking_queue('parking_entry_queue', len(self.parking_entry.queue), 'dequeue')
             parking_entry_service = config.CAR['ParkingLotEntryDelay']()
             yield self.env.timeout(parking_entry_service)
@@ -164,19 +161,3 @@ class TCar:
             actor_id=self.car_id,
         )
 
-    def _log_segment(self, event_type, u, v):
-        if not self.logger:
-            return
-        state = edge_state(u, v, self.density_map)
-        self.logger.log_segment_density(
-            sim_time=self.env.now,
-            event_type=event_type,
-            actor_type='car',
-            actor_id=self.car_id,
-            u=u,
-            v=v,
-            segment_id=f"{u}->{v}",
-            **state,
-        )
-        
-            
