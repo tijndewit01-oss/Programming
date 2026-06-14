@@ -18,7 +18,7 @@ Saves graph as network.pkl
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
-
+min_length = config.ROAD_NETWORK['Min_segment_length']
 
 
 
@@ -39,7 +39,10 @@ Car_Spacing = config.TRAFFIC_MODEL['Car_Spacing']
 
 for u, v, data in G.edges(data=True):
     length = data.get('length', 0.0)
-    lanes_raw = data.get('lanes', 1)
+    if not data.get('oneway', True):
+        lanes_raw = data.get('lanes', 2)/2
+    else:
+        lanes_raw = data.get('lanes', 1)
     try:
         u_max = float(str(data.get('maxspeed', config.TRAFFIC_MODEL['speed_fallback'])).split()[0]) #if not specified default to 30 kph
     except:
@@ -50,7 +53,7 @@ for u, v, data in G.edges(data=True):
         lanes = int(lanes_raw[0])
     else:
         lanes = int(lanes_raw)
-    data['rho_max'] = (length / Car_Spacing) * lanes
+    data['rho_max'] = (max(length, min_length) / Car_Spacing) * lanes
 
 
 # save
