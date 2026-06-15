@@ -1,7 +1,7 @@
 """Small formatting helpers shared by dashboard.py and visualisation.py.
 
-These were previously copy-pasted (byte-for-byte) into both files; keeping a
-single definition here avoids the two drifting apart.
+Keeping these in one module avoids the two visualisation scripts drifting apart
+with subtly different copies of the same helpers.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def safe_float(value: Any, default: float = math.nan) -> float:
 
 
 def seconds_to_clock(seconds: float) -> str:
-    """Format a simulation time (seconds since midnight) as a 'HH:MM' clock string."""
+    """Format a time (seconds since midnight) as an 'HH:MM' 24-hour clock string."""
     if not math.isfinite(float(seconds)):
         return ''
     total = int(round(float(seconds)))

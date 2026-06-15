@@ -71,6 +71,7 @@ PLOT_CONFIG = {
 
 
 def load_all_summaries(log_dir: str = LOG_DIR) -> list[dict[str, Any]]:
+    """Read every scenario summary (one JSON object per line) from the log dir."""
     path = os.path.join(log_dir, 'scenario_summary.jsonl')
     if not os.path.exists(path):
         raise FileNotFoundError(f'Missing scenario summary log: {path}')
@@ -87,10 +88,12 @@ def load_all_summaries(log_dir: str = LOG_DIR) -> list[dict[str, Any]]:
 
 
 def latest_run_id(summaries: list[dict[str, Any]]) -> str:
+    """Return the run_id of the most recently logged summary."""
     return str(summaries[-1]['run_id'])
 
 
 def load_run_logs(log_dir: str, run_id: str) -> dict[str, pd.DataFrame]:
+    """Load each log CSV filtered to one run, keyed by a short log name."""
     return {
         'visitors': read_run_csv(
             log_dir,
@@ -138,10 +141,16 @@ def load_run_logs(log_dir: str, run_id: str) -> dict[str, pd.DataFrame]:
 
 
 def read_run_csv(log_dir: str, filename: str, run_id: str, requested_columns: list[str]) -> pd.DataFrame:
+    """Read one log CSV, keeping only the requested columns and this run's rows.
+
+    Missing files yield an empty frame, and the requested numeric columns are
+    coerced to numbers so downstream charts can rely on numeric dtypes.
+    """
     path = os.path.join(log_dir, filename)
     if not os.path.exists(path):
         return pd.DataFrame(columns=requested_columns)
 
+    # Only read columns that actually exist in this file's header.
     header = pd.read_csv(path, nrows=0).columns.tolist()
     usecols = [column for column in requested_columns if column in header]
     df = pd.read_csv(path, usecols=usecols)
@@ -164,6 +173,7 @@ def read_run_csv(log_dir: str, filename: str, run_id: str, requested_columns: li
 
 
 def scenario_dataframe(summaries: list[dict[str, Any]]) -> pd.DataFrame:
+    """Flatten the list of scenario summaries into one row-per-run DataFrame."""
     rows = []
     for index, summary in enumerate(summaries, start=1):
         peak_queues = summary.get('peak_queues') or {}
@@ -206,6 +216,7 @@ def create_dashboard(
     output_path: str = DASHBOARD_OUTPUT_PATH,
     run_id: str | None = None,
 ) -> str:
+    """Build every figure, render the HTML page, and write it to output_path."""
     summaries = load_all_summaries(log_dir)
     selected_run_id = run_id or latest_run_id(summaries)
     selected_summary = select_summary(summaries, selected_run_id)
@@ -237,6 +248,7 @@ def create_dashboard(
 
 
 def select_summary(summaries: list[dict[str, Any]], run_id: str) -> dict[str, Any]:
+    """Return the summary matching run_id, falling back to the most recent one."""
     for summary in reversed(summaries):
         if str(summary.get('run_id')) == str(run_id):
             return summary
@@ -244,6 +256,7 @@ def select_summary(summaries: list[dict[str, Any]], run_id: str) -> dict[str, An
 
 
 def figure_scenario_comparison(df: pd.DataFrame) -> go.Figure:
+    """Four-panel comparison across runs: completion, travel time, CO2, queues."""
     fig = make_subplots(
         rows=2,
         cols=2,
@@ -327,6 +340,7 @@ def figure_scenario_comparison(df: pd.DataFrame) -> go.Figure:
 
 
 def figure_scenario_table(df: pd.DataFrame) -> go.Figure:
+    """Render the per-run KPIs as a formatted summary table figure."""
     table = df.copy()
     table['completion_rate'] = table['completion_rate'].map(format_percent)
     for column in ['avg_travel_min', 'median_travel_min', 'p95_travel_min']:
@@ -369,6 +383,7 @@ def figure_scenario_table(df: pd.DataFrame) -> go.Figure:
 
 
 def figure_travel_time_distribution(visitors: pd.DataFrame) -> go.Figure:
+    """Histogram of completed travel times with an overlaid cumulative curve."""
     travel_minutes = completed_travel_minutes(visitors)
     if travel_minutes.empty:
         return blank_figure('Travel Time Distribution', 'No completed visitor travel times available.')
@@ -434,6 +449,7 @@ def figure_travel_time_distribution(visitors: pd.DataFrame) -> go.Figure:
 
 
 def figure_queue_timeseries(queues: pd.DataFrame) -> go.Figure:
+    """Time series of every queue length plus parking-lot occupancy."""
     queue_series = queue_snapshot_pivot(queues)
     if queue_series.empty:
         return blank_figure('Queue Development', 'No queue snapshots available.')
@@ -498,6 +514,7 @@ def figure_queue_timeseries(queues: pd.DataFrame) -> go.Figure:
 
 
 def figure_funnel_area(funnel: pd.DataFrame, summary: dict[str, Any]) -> go.Figure:
+    """Stacked area chart of how many visitors are in each state over time."""
     states = state_counts_over_time(funnel, summary)
     if states.empty:
         return blank_figure('Visitor Arrival Funnel', 'No visitor state log available.')
@@ -545,6 +562,7 @@ def figure_funnel_area(funnel: pd.DataFrame, summary: dict[str, Any]) -> go.Figu
 
 
 def figure_phase_times(visitors: pd.DataFrame, summary: dict[str, Any]) -> go.Figure:
+    """Horizontal bar chart of the average minutes spent in each journey phase."""
     values = average_phase_minutes(visitors, summary)
     if not values:
         return blank_figure('Journey Phase Times', 'No phase-duration fields available.')
@@ -574,6 +592,7 @@ def figure_phase_times(visitors: pd.DataFrame, summary: dict[str, Any]) -> go.Fi
 
 
 def figure_bus_utilisation(buses: pd.DataFrame) -> go.Figure:
+    """Heatmap of each bus's load factor per trip."""
     if buses.empty or 'load_factor' not in buses:
         return blank_figure('Bus Utilisation', 'No bus trip log available.')
 
@@ -606,6 +625,7 @@ def figure_bus_utilisation(buses: pd.DataFrame) -> go.Figure:
 
 
 def figure_congestion_hotspots(segments: pd.DataFrame) -> go.Figure:
+    """Bar chart of the 15 most congested road segments by peak congestion ratio."""
     if segments.empty or 'congestion_ratio' not in segments:
         return blank_figure('Road Congestion Hotspots', 'No segment density log available.')
 
@@ -648,6 +668,7 @@ def figure_congestion_hotspots(segments: pd.DataFrame) -> go.Figure:
     return fig
 
 def figure_visitor_generation(visitors):
+    """Histogram and cumulative curve of when visitors departed (entered the sim)."""
     visitor_in_system = visitors['depart_time']
     if visitor_in_system.empty:
         return blank_figure('Visitor Start Time Distribution', 'No completed visitor start times available.')
@@ -713,6 +734,11 @@ def figure_visitor_generation(visitors):
     return fig
 
 def completed_travel_minutes(visitors: pd.DataFrame) -> pd.Series:
+    """Return the travel times (minutes) of completed visitors, dropping bad rows.
+
+    Falls back to arrival_time - depart_time when total_time is missing, and
+    discards any negative results.
+    """
     if visitors.empty:
         return pd.Series(dtype=float)
 
@@ -725,6 +751,11 @@ def completed_travel_minutes(visitors: pd.DataFrame) -> pd.Series:
 
 
 def queue_snapshot_pivot(queues: pd.DataFrame) -> pd.DataFrame:
+    """Pivot queue snapshots into a time x queue-name table of lengths.
+
+    Per-node car queues are summed into a single 'car_queues_total' column, and
+    only the queues named in QUEUE_LABELS are kept.
+    """
     if queues.empty:
         return pd.DataFrame()
 
@@ -745,6 +776,11 @@ def queue_snapshot_pivot(queues: pd.DataFrame) -> pd.DataFrame:
 
 
 def state_counts_over_time(funnel: pd.DataFrame, summary: dict[str, Any], step_seconds: int = 300) -> pd.DataFrame:
+    """Count how many visitors occupy each state at every step_seconds tick.
+
+    Replays the funnel events in time order, carrying each visitor's latest
+    state forward, and treats not-yet-generated visitors as 'not_started'.
+    """
     if funnel.empty:
         return pd.DataFrame()
 
@@ -780,6 +816,11 @@ def state_counts_over_time(funnel: pd.DataFrame, summary: dict[str, Any], step_s
 
 
 def average_phase_minutes(visitors: pd.DataFrame, summary: dict[str, Any]) -> dict[str, float]:
+    """Return the average minutes per journey phase, preferring the summary values.
+
+    Uses the precomputed avg_phase_times from the summary when present, otherwise
+    averages the phase columns in the visitor log.
+    """
     summary_phases = summary.get('avg_phase_times') or {}
     values: dict[str, float] = {}
     for column in PHASE_LABELS:
@@ -800,7 +841,9 @@ def render_html(
     scenario_df: pd.DataFrame,
     figures: list[tuple[str, go.Figure]],
 ) -> str:
+    """Assemble the full dashboard HTML string from the KPI cards and figures."""
     sections = []
+    # Embed plotly.js only once (in the first figure) to keep the file small.
     include_plotlyjs: bool | str = True
     for title, figure in figures:
         sections.append(
@@ -931,6 +974,7 @@ def render_html(
 
 
 def kpi_cards(summary: dict[str, Any]) -> str:
+    """Return the HTML for the row of headline KPI cards at the top of the page."""
     generated = safe_float(summary.get('visitors_generated') or summary.get('number_visitors_config'), 0)
     completed = safe_float(summary.get('visitors_completed'), 0)
     completion = completed / generated if generated else math.nan
@@ -960,6 +1004,7 @@ def kpi_cards(summary: dict[str, Any]) -> str:
 
 
 def blank_figure(title: str, message: str) -> go.Figure:
+    """Return a placeholder figure showing a centred message when data is missing."""
     fig = go.Figure()
     fig.add_annotation(text=message, x=0.5, y=0.5, xref='paper', yref='paper', showarrow=False)
     fig.update_layout(template='plotly_white', height=330, title=title)
@@ -969,6 +1014,7 @@ def blank_figure(title: str, message: str) -> go.Figure:
 
 
 def configure_time_axis(fig: go.Figure, values: pd.Index | pd.Series | list[float], row: int | None = None, col: int | None = None) -> None:
+    """Relabel an x axis of seconds as HH:MM clock ticks at sensible intervals."""
     numeric_values = [float(value) for value in values if pd.notna(value)]
     if not numeric_values:
         return
@@ -990,11 +1036,13 @@ def configure_time_axis(fig: go.Figure, values: pd.Index | pd.Series | list[floa
 
 
 def seconds_to_minutes(value: Any) -> float:
+    """Convert seconds to minutes, returning NaN for non-finite inputs."""
     seconds = safe_float(value)
     return seconds / 60 if math.isfinite(seconds) else math.nan
 
 
 def format_duration(value: Any) -> str:
+    """Format a duration in seconds as a human string in minutes or hours."""
     minutes = seconds_to_minutes(value)
     if not math.isfinite(minutes):
         return 'n/a'
@@ -1004,11 +1052,13 @@ def format_duration(value: Any) -> str:
 
 
 def format_percent(value: Any) -> str:
+    """Format a 0-1 fraction as a percentage string, or 'n/a' if not finite."""
     number = safe_float(value)
     return 'n/a' if not math.isfinite(number) else f'{number * 100:.1f}%'
 
 
 def format_number(value: Any, decimals: int = 0) -> str:
+    """Format a number with thousands separators, or 'n/a' if not finite."""
     number = safe_float(value)
     if not math.isfinite(number):
         return 'n/a'
@@ -1016,6 +1066,7 @@ def format_number(value: Any, decimals: int = 0) -> str:
 
 
 def main() -> None:
+    """Parse command-line options and build the dashboard HTML file."""
     parser = argparse.ArgumentParser(description='Build the simulation analysis dashboard.')
     parser.add_argument('--run-id', default=None, help='Run ID to use for detailed charts. Defaults to latest run.')
     parser.add_argument('--log-dir', default=LOG_DIR, help='Directory containing simulation log files.')

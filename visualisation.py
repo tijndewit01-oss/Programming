@@ -207,6 +207,7 @@ def load_network(network_path: str = NETWORK_PATH) -> tuple[dict[str, dict[str, 
 
 
 def edge_coordinates(graph: Any, u: int, v: int, data: dict[str, Any]) -> list[tuple[float, float]]:
+    """Return an edge's coordinate list: its geometry if present, else a straight line."""
     geometry = data.get('geometry')
     if geometry is not None and hasattr(geometry, 'coords'):
         return [(float(x), float(y)) for x, y in geometry.coords]
@@ -223,6 +224,11 @@ def edge_coordinates(graph: Any, u: int, v: int, data: dict[str, Any]) -> list[t
 
 
 def build_frame_times(logs: dict[str, pd.DataFrame], summary: dict[str, Any], step_seconds: int) -> list[float]:
+    """Build the evenly spaced list of animation frame times for the replay.
+
+    The window spans the event start/end, widened to cover any observed log
+    times, and a final frame is appended for the exact end time if needed.
+    """
     start_time = summary.get('event_start_time') or config.SIMULATION['EventStartTime']
     end_time = summary.get('finished_at') or summary.get('event_ending_time') or config.SIMULATION['EventEndingTime']
 
@@ -245,6 +251,7 @@ def build_frame_times(logs: dict[str, pd.DataFrame], summary: dict[str, Any], st
 
 
 def build_static_network_payload(edge_lookup: dict[str, dict[str, Any]]) -> dict[str, list[float | None]]:
+    """Flatten all edges into one x/y polyline (None separators) for the base map."""
     x_values: list[float | None] = []
     y_values: list[float | None] = []
     for edge in edge_lookup.values():
@@ -331,6 +338,7 @@ def build_location_marker_groups(node_lookup: dict[int, tuple[float, float]]) ->
 
 
 def build_road_snapshots(segment_log: pd.DataFrame, edge_lookup: dict[str, dict[str, Any]]) -> dict[float, list[dict[str, list[float | None]]]]:
+    """Group segment snapshots by time into per-time congestion-bucket payloads."""
     if segment_log.empty:
         return {}
 
@@ -348,10 +356,11 @@ def build_road_snapshots(segment_log: pd.DataFrame, edge_lookup: dict[str, dict[
 
 
 def road_bucket_payloads(rows: pd.DataFrame, edge_lookup: dict[str, dict[str, Any]]) -> list[dict[str, list[float | None]]]:
-    # Seed empty buckets with None so Plotly still shows every congestion
-    # category in the legend before all categories appear in the animation.
+    """Sort one time slice of segments into one polyline payload per congestion bucket."""
+    # Seed each bucket with a None point so Plotly lists every congestion
+    # category in the legend even before it appears in the animation.
     payloads = [{'x': [None], 'y': [None], 'hovertext': [None]} for _ in ROAD_BUCKETS]
-  
+
 
     for row in rows.itertuples(index=False):
         segment_id = str(getattr(row, 'segment_id', ''))
@@ -378,6 +387,7 @@ def road_bucket_payloads(rows: pd.DataFrame, edge_lookup: dict[str, dict[str, An
 
 
 def road_bucket_index(congestion_ratio: float) -> int:
+    """Return the index of the congestion bucket a ratio falls into."""
     for index, (_, _, upper_bound, _, _) in enumerate(ROAD_BUCKETS):
         if congestion_ratio <= upper_bound:
             return index
@@ -385,6 +395,7 @@ def road_bucket_index(congestion_ratio: float) -> int:
 
 
 def build_queue_series(queue_log: pd.DataFrame, frame_times: list[float]) -> dict[float, dict[str, float]]:
+    """Resample queue lengths onto each frame time, summing the per-node car queues."""
     empty = {name: 0.0 for name, _ in QUEUE_ORDER}
     if queue_log.empty:
         return {time: dict(empty) for time in frame_times}
@@ -419,6 +430,7 @@ def build_queue_series(queue_log: pd.DataFrame, frame_times: list[float]) -> dic
 
 
 def build_visitor_state_series(funnel_log: pd.DataFrame, frame_times: list[float], summary: dict[str, Any]) -> dict[float, dict[str, int]]:
+    """Count visitors in each state at every frame time by replaying the funnel log."""
     total_visitors = int(summary.get('visitors_generated') or summary.get('number_visitors_config') or 0)
     if funnel_log.empty:
         return {
@@ -452,6 +464,7 @@ def build_visitor_state_series(funnel_log: pd.DataFrame, frame_times: list[float
 
 
 def build_bus_intervals(segment_log: pd.DataFrame) -> dict[int, list[dict[str, Any]]]:
+    """Pair each bus's enter/exit segment events into timed edge-occupancy intervals."""
     if segment_log.empty:
         return {}
 
@@ -495,6 +508,7 @@ def build_bus_intervals(segment_log: pd.DataFrame) -> dict[int, list[dict[str, A
 
 
 def build_bus_trips(bus_log: pd.DataFrame) -> dict[int, list[dict[str, float]]]:
+    """Extract each bus's trips as depart/arrival/return timestamps for stop placement."""
     if bus_log.empty:
         return {}
 
@@ -524,6 +538,11 @@ def build_bus_position_series(
     edge_lookup: dict[str, dict[str, Any]],
     node_lookup: dict[int, tuple[float, float]],
 ) -> dict[float, dict[str, list[Any]]]:
+    """Compute each bus's map position at every frame time for the marker trace.
+
+    A bus that is mid-edge is interpolated along its polyline; otherwise it is
+    placed at the station or festival based on its trip timings.
+    """
     bus_ids = sorted(set(intervals_by_bus) | set(trips_by_bus))
     source = int(config.ROAD_NETWORK['Bus_start'])
     destination = int(config.ROAD_NETWORK['Parkinglot'])
@@ -575,6 +594,7 @@ def active_bus_position(
     intervals_by_bus: dict[int, list[dict[str, Any]]],
     edge_lookup: dict[str, dict[str, Any]],
 ) -> tuple[float, float] | None:
+    """Return a bus's interpolated position if it is driving an edge at frame_time."""
     for interval in intervals_by_bus.get(bus_id, []):
         if interval['start'] <= frame_time <= interval['end']:
             edge = edge_lookup.get(interval['segment_id'])
@@ -587,6 +607,7 @@ def active_bus_position(
 
 
 def stationary_bus_location(frame_time: float, trips: list[dict[str, float]]) -> str:
+    """Classify a non-driving bus as at the station, at the festival, or driving."""
     for trip in trips:
         depart = trip['depart']
         arrival = trip['arrival']
@@ -603,6 +624,7 @@ def stationary_bus_location(frame_time: float, trips: list[dict[str, float]]) ->
 
 
 def interpolate_polyline(coords: list[tuple[float, float]], fraction: float) -> tuple[float, float] | None:
+    """Return the point a given fraction of the way along a multi-point polyline."""
     if not coords:
         return None
     if fraction <= 0:
@@ -642,6 +664,7 @@ def build_simulation_replay(
     run_id: str | None = None,
     frame_step_seconds: int = FRAME_STEP_SECONDS,
 ) -> str:
+    """Load logs, build all series and the figure, and write the replay HTML file."""
     selected_run_id, logs, summary = load_logs(log_dir, run_id)
     edge_lookup, node_lookup, bounds = load_network(network_path)
     frame_times = build_frame_times(logs, summary, frame_step_seconds)
@@ -687,6 +710,7 @@ def create_replay_figure(
     bus_series: dict[float, dict[str, list[Any]]],
     location_marker_groups: list[dict[str, Any]],
 ) -> go.Figure:
+    """Assemble the initial subplot figure (map + queue/state bars) and its frames."""
     fig = make_subplots(
         rows=2,
         cols=2,
@@ -702,9 +726,10 @@ def create_replay_figure(
         ),
     )
 
+    # Build the traces shown on the very first frame; later frames overwrite them.
     first_time = frame_times[0]
     static_network = build_static_network_payload(edge_lookup)
-    first_roads = road_payload_at(first_time, road_snapshots, road_snapshot_times)[0]  # [0]: payload only
+    first_roads = road_payload_at(first_time, road_snapshots, road_snapshot_times)[0]  # Index 0 is the payload (index 1 is the snapshot time).
     first_queues = queue_values_at(first_time, queue_series)
     first_states = state_values_at(first_time, visitor_state_series)
     first_buses = bus_series[first_time]
@@ -809,6 +834,7 @@ def create_replay_figure(
     return fig
 
 def add_location_markers(fig: go.Figure, location_marker_groups: list[dict[str, Any]]) -> None:
+    """Add the static point-of-interest markers (entries, station, festival) to the map."""
     for group in location_marker_groups:
         style = group['style']
         fig.add_trace(
@@ -844,6 +870,7 @@ def build_frames(
     visitor_state_series: dict[float, dict[str, int]],
     bus_series: dict[float, dict[str, list[Any]]],
 ) -> list[go.Frame]:
+    """Build one Plotly animation frame per frame time, reusing road traces when unchanged."""
     frames: list[go.Frame] = []
     prev_snapshot_time = None
     prev_road_traces = None
@@ -905,6 +932,7 @@ def configure_layout(
     queue_series: dict[float, dict[str, float]],
     visitor_state_series: dict[float, dict[str, int]],
 ) -> None:
+    """Set the figure title, axes, play/pause buttons and time slider for the replay."""
     min_x, max_x, min_y, max_y = bounds
     pad_x = (max_x - min_x) * 0.06
     pad_y = (max_y - min_y) * 0.06
@@ -998,6 +1026,7 @@ def configure_layout(
 
 
 def build_slider(frame_times: list[float]) -> dict[str, Any]:
+    """Build the time-slider definition, labelling only every 30th tick to avoid clutter."""
     steps = []
     for index, frame_time in enumerate(frame_times):
         label = seconds_to_clock(frame_time) if index % 30 == 0 or index == len(frame_times) - 1 else ''
@@ -1035,6 +1064,7 @@ def road_payload_at(
     road_snapshots: dict[float, list[dict[str, list[float | None]]]],
     road_snapshot_times: list[float],
 ) -> tuple[list[dict[str, list[float | None]]], float | None]:
+    """Return the most recent road snapshot at or before frame_time, with its time."""
     if not road_snapshot_times:
         return [{'x': [], 'y': [], 'hovertext': []} for _ in ROAD_BUCKETS], None
 
@@ -1044,6 +1074,7 @@ def road_payload_at(
     return road_snapshots[road_snapshot_times[index]], road_snapshot_times[index]
 
 def queue_values_at(frame_time: float, queue_series: dict[float, dict[str, float]]) -> dict[str, list[Any]]:
+    """Return ordered queue labels, values and text labels for one frame's bar chart."""
     values_by_name = queue_series[frame_time]
     labels = [label for _, label in QUEUE_ORDER]
     values = [values_by_name.get(name, 0.0) for name, _ in QUEUE_ORDER]
@@ -1055,6 +1086,7 @@ def queue_values_at(frame_time: float, queue_series: dict[float, dict[str, float
 
 
 def state_values_at(frame_time: float, visitor_state_series: dict[float, dict[str, int]]) -> dict[str, list[Any]]:
+    """Return ordered state labels, values and text labels for one frame's bar chart."""
     values_by_state = visitor_state_series[frame_time]
     labels = [label for _, label in VISITOR_STATES]
     values = [values_by_state.get(state, 0) for state, _ in VISITOR_STATES]
@@ -1066,6 +1098,7 @@ def state_values_at(frame_time: float, visitor_state_series: dict[float, dict[st
 
 
 def replay_title(run_id: str, summary: dict[str, Any], frame_time: float) -> str:
+    """Build the figure title line showing run, clock time and completion count."""
     visitors_completed = summary.get('visitors_completed', '?')
     visitors_generated = summary.get('visitors_generated', summary.get('number_visitors_config', '?'))
     return (
@@ -1075,10 +1108,12 @@ def replay_title(run_id: str, summary: dict[str, Any], frame_time: float) -> str
 
 
 def format_count(value: float) -> str:
+    """Format a count as an integer with thousands separators."""
     return f'{float(value):,.0f}'
 
 
 def main() -> None:
+    """Build the replay HTML file and print where it was written."""
     output_path = build_simulation_replay()
     print(f'Wrote replay to {output_path}')
 

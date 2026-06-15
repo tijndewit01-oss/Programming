@@ -1,17 +1,18 @@
-#The TCarGenerator class (PDL: TCarGenerator)
+"""TCarGenerator: keeps one car waiting at every entry node at all times."""
 import config
 from Functions.TCar import TCar
 
 
 class TCarGenerator:
-    """Keeps a car waiting at the loading bay at all times (PDL: TCarGenerator).
+    """Ensures a car is always ready to load at each car entry node.
 
-    As soon as a car departs, a new one is immediately generated in its place
-    so there is always a car available to pick up waiting visitors (per node CHANGED).
+    A separate process per entry node spawns a TCar, waits for it to depart,
+    then immediately spawns the next one, so visitors arriving at any node
+    always find a car waiting to pick them up.
 
-    SimPy translation note: the PDL uses CarFree as a boolean semaphore with
-    a Standby loop. Here we use a simpy.Event that the departing car triggers,
-    waking the generator so it can spawn the next car.
+    Implementation note: the car signals its departure via a SimPy event
+    (TCar.departed_event); awaiting that event is how the generator knows it is
+    time to create the replacement car.
     """
 
     def __init__(self, env, G, density_map, parking_lot, parking_entry, carqueues, logger=None):
@@ -29,13 +30,15 @@ class TCarGenerator:
 
 
     def run(self):
-        # start_nodes is a {name: node_id} dict; iterate the node IDs so that
-        # the car's source matches the carqueue keys and the road-graph nodes
+        """Start one independent car-management process per entry node."""
+        # start_nodes maps name -> node_id; iterate node IDs so the source
+        # matches both the carqueue keys and the road-graph nodes.
         for node in self.start_nodes.values():
             self.env.process(self.manage_node(node))
         yield self.env.timeout(0)
 
     def manage_node(self, node):
+        """Continuously replace the car at one node as soon as it departs."""
         while True:
             car_id = self.logger.next_id('car') if self.logger else None
             car = TCar(
@@ -50,4 +53,3 @@ class TCarGenerator:
                 logger=self.logger,
             )
             yield car.departed_event
-            

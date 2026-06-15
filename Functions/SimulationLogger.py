@@ -1,3 +1,10 @@
+"""SimulationLogger: buffers simulation events and writes them to CSV/JSONL.
+
+Components push rows into the logger during a run; the logger holds them in
+memory, derives per-visitor phase durations and summary KPIs at the end, and
+appends everything to the log files. Each run is tagged with a run_id so several
+runs can share the same files (used by the multi-scenario sweep).
+"""
 import csv
 import json
 import os
@@ -9,6 +16,7 @@ from datetime import datetime
 class SimulationLogger:
     """Collect simulation rows in memory and write appendable CSV/JSONL outputs."""
 
+    # Column order for each output CSV; rows missing a column are written blank.
     CSV_SCHEMAS = {
         'visitor_log.csv': [
             'run_id', 'visitor_id', 'mode', 'start_node_name', 'start_node',
@@ -43,6 +51,7 @@ class SimulationLogger:
         ],
     }
 
+    # Per-visitor duration columns accumulated from the state-transition log.
     PHASE_COLUMNS = [
         'walking_time',
         'waiting_car_time',
@@ -54,6 +63,7 @@ class SimulationLogger:
         'scanning_time',
     ]
 
+    # Maps each visitor state to the phase column that its duration adds to.
     STATE_DURATION_MAP = {
         'walking_to_bus': 'walking_time',
         'walking_ticket': 'walking_time',
@@ -68,22 +78,26 @@ class SimulationLogger:
 
     def __init__(self, output_dir, run_id=None):
         self.output_dir = output_dir
+        # Use the supplied run_id, or generate a timestamped unique one.
         self.run_id = run_id or self._make_run_id()
-        self._counters = {}
-        self._rows = {filename: [] for filename in self.CSV_SCHEMAS}
+        self._counters = {}                                       # Per-entity ID counters.
+        self._rows = {filename: [] for filename in self.CSV_SCHEMAS}  # Buffered rows per file.
         self._scenario_summaries = []
-        self._visitors = {}
+        self._visitors = {}                                      # visitor_id -> accumulating row.
         self.final_time = None
 
     def _make_run_id(self):
+        """Build a unique run_id from the current timestamp plus a random suffix."""
         stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         return f"{stamp}_{uuid.uuid4().hex[:8]}"
 
     def next_id(self, entity_name):
+        """Return the next sequential integer ID for the given entity type."""
         self._counters[entity_name] = self._counters.get(entity_name, 0) + 1
         return self._counters[entity_name]
 
     def register_visitor(self, visitor_id, mode, start_node_name, start_node, depart_time):
+        """Create the in-memory visitor row, with all phase durations zeroed."""
         self._visitors[visitor_id] = {
             'run_id': self.run_id,
             'visitor_id': visitor_id,
@@ -106,6 +120,7 @@ class SimulationLogger:
         }
 
     def log_visitor_state(self, visitor_id, sim_time, state, mode='', location=''):
+        """Record a visitor state transition and update its latest known state."""
         if visitor_id in self._visitors:
             self._visitors[visitor_id]['final_state'] = state
         self._rows['arrival_funnel_log.csv'].append({
@@ -118,6 +133,7 @@ class SimulationLogger:
         })
 
     def complete_visitor(self, visitor_id, arrival_time):
+        """Mark a visitor as having finished the ticket scan and left the system."""
         if visitor_id not in self._visitors:
             return
         self._visitors[visitor_id]['arrival_time'] = arrival_time
@@ -125,32 +141,41 @@ class SimulationLogger:
         self._visitors[visitor_id]['final_state'] = 'scanned'
 
     def log_car(self, **row):
+        """Buffer a finished-car row."""
         self._rows['car_log.csv'].append(self._with_run_id(row))
 
     def log_bus_trip(self, **row):
+        """Buffer a completed bus-trip row."""
         self._rows['bus_log.csv'].append(self._with_run_id(row))
 
     def log_segment_density(self, **row):
+        """Buffer a road-segment density-event row."""
         self._rows['segment_density_log.csv'].append(self._with_run_id(row))
 
     def log_queue(self, **row):
+        """Buffer a queue event/snapshot row."""
         self._rows['queue_log.csv'].append(self._with_run_id(row))
 
     def log_scenario_summary(self, summary):
+        """Buffer a scenario-summary dict, tagged with the run_id and JSON-safe."""
         summary = dict(summary)
         summary['run_id'] = self.run_id
         self._scenario_summaries.append(self._json_safe(summary))
 
     def visitor_count(self):
+        """Return the number of visitors registered this run."""
         return len(self._visitors)
 
     def completed_visitor_count(self):
+        """Return the number of visitors that finished the ticket scan."""
         return sum(1 for visitor in self._visitors.values() if visitor['completed'])
 
     def set_final_time(self, final_time):
+        """Record the simulation end time, used to close out unfinished visitors."""
         self.final_time = final_time
 
     def summary_metrics(self, emission_factors):
+        """Compute the headline KPIs for the run (travel times, CO2, peaks, etc.)."""
         self._finalize_visitors()
         visitor_rows = list(self._visitors.values())
         completed_times = [
@@ -162,6 +187,7 @@ class SimulationLogger:
         for row in visitor_rows:
             mode_counts[row['mode']] = mode_counts.get(row['mode'], 0) + 1
 
+        # Turn logged distances into kilometres, then into kg CO2.
         car_distance_km = sum(float(row.get('route_length_m') or 0) for row in self._rows['car_log.csv']) / 1000
         bus_distance_km = sum(
             float(row.get('outbound_distance_m') or 0) + float(row.get('return_distance_m') or 0)
@@ -189,11 +215,13 @@ class SimulationLogger:
         }
 
     def _with_run_id(self, row):
+        """Return a copy of row stamped with the current run_id."""
         output = dict(row)
         output['run_id'] = self.run_id
         return output
 
     def _json_safe(self, value):
+        """Recursively convert a value into something json.dumps can serialise."""
         if isinstance(value, dict):
             return {str(k): self._json_safe(v) for k, v in value.items()}
         if isinstance(value, (list, tuple)):
@@ -207,6 +235,7 @@ class SimulationLogger:
             return str(value)
 
     def flush(self, final_time=None):
+        """Finalise visitors and append all buffered rows to the output files."""
         if final_time is not None:
             self.final_time = final_time
         os.makedirs(self.output_dir, exist_ok=True)
@@ -215,6 +244,7 @@ class SimulationLogger:
 
         for filename, fieldnames in self.CSV_SCHEMAS.items():
             path = os.path.join(self.output_dir, filename)
+            # Rewrite the file header if an older run used a different schema.
             self._migrate_csv_schema(path, fieldnames)
             should_write_header = not os.path.exists(path) or os.path.getsize(path) == 0
             with open(path, 'a', newline='') as f:
@@ -224,12 +254,14 @@ class SimulationLogger:
                 for row in self._rows[filename]:
                     writer.writerow(row)
 
+        # Scenario summaries are appended one JSON object per line.
         summary_path = os.path.join(self.output_dir, 'scenario_summary.jsonl')
         with open(summary_path, 'a') as f:
             for summary in self._scenario_summaries:
                 f.write(json.dumps(summary, sort_keys=True) + '\n')
 
     def _finalize_visitors(self):
+        """Derive each visitor's phase durations and total time from their events."""
         events_by_visitor = {}
         for row in self._rows['arrival_funnel_log.csv']:
             events_by_visitor.setdefault(row['visitor_id'], []).append(row)
@@ -238,6 +270,8 @@ class SimulationLogger:
             for column in self.PHASE_COLUMNS:
                 visitor[column] = 0.0
 
+            # Each state lasts until the next state event (or until the run ends),
+            # and that duration is added to the matching phase column.
             events = sorted(
                 events_by_visitor.get(visitor_id, []),
                 key=lambda row: float(row['sim_time']),
@@ -259,6 +293,7 @@ class SimulationLogger:
                 visitor['total_time'] = max(0.0, end_time - float(visitor['depart_time']))
 
     def _visitor_end_time(self, visitor):
+        """Return a visitor's end time: their arrival, else the run's final time."""
         if visitor['arrival_time'] != '':
             return float(visitor['arrival_time'])
         if self.final_time is not None:
@@ -266,6 +301,7 @@ class SimulationLogger:
         return ''
 
     def _migrate_csv_schema(self, path, fieldnames):
+        """Rewrite an existing CSV's header/rows if its columns no longer match."""
         if not os.path.exists(path) or os.path.getsize(path) == 0:
             return
         with open(path, newline='') as f:
@@ -281,6 +317,7 @@ class SimulationLogger:
                 writer.writerow(row)
 
     def _peak_queues(self):
+        """Return the maximum length reached by each named queue this run."""
         peaks = {}
         for row in self._rows['queue_log.csv']:
             queue_name = row['queue_name']
@@ -289,6 +326,7 @@ class SimulationLogger:
         return peaks
 
     def _max_numeric(self, filename, column):
+        """Return the maximum numeric value in one column of a buffered log."""
         values = [
             float(row.get(column) or 0)
             for row in self._rows[filename]
@@ -297,12 +335,15 @@ class SimulationLogger:
         return max(values) if values else 0.0
 
     def _mean(self, values):
+        """Return the mean, or 0.0 for an empty sequence."""
         return statistics.mean(values) if values else 0.0
 
     def _median(self, values):
+        """Return the median, or 0.0 for an empty sequence."""
         return statistics.median(values) if values else 0.0
 
     def _percentile(self, values, percentile):
+        """Return the given percentile via linear interpolation, or 0.0 if empty."""
         if not values:
             return 0.0
         ordered = sorted(values)

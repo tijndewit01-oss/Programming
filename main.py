@@ -1,13 +1,14 @@
-"""Initialization — single wiring point for the simulation (PDL: Initialization).
+"""Entry point that wires up and runs one simulation.
 
-Responsibilities:
-  1. Create the SimPy environment.
+This module is the single place where all the moving parts are connected:
+
+  1. Create the SimPy environment (the discrete-event clock).
   2. Load the road network and build the shared traffic-density state.
-  3. Create ALL shared queues + the parking lot here, and inject them into the
-     components (so runtime infrastructure lives in exactly one place).
-  4. Validate/clean the entry-node data before the run.
-  5. Start every component process and run the simulation.
-  6. Print a short summary.
+  3. Create every shared queue and the parking lot, then inject them into the
+     components, so the runtime infrastructure is defined in exactly one spot.
+  4. Validate and clean the car entry-node data before the run starts.
+  5. Start every component process and run the simulation to the end time.
+  6. Write the logs and print a short summary.
 
 Run with:  python main.py
 """
@@ -16,6 +17,7 @@ import os
 import sys
 import pickle
 
+# Make the project root importable regardless of the launch directory.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import simpy
@@ -36,17 +38,18 @@ from Functions.TVisitorGenerator import TVisitorGenerator
 from Functions.SimulationLogger import SimulationLogger
 
 
+# Prepared OSMnx road graph produced by INPUT_Data_Files/Prepare_network.py.
 NETWORK_PKL = os.path.join('INPUT_Data_Files', 'network.pkl')
 
-# PLACEHOLDER: effectively-unlimited parking until Phase 7 adds a real capacity cap.
+# Effectively-unlimited parking capacity until a real cap is modelled.
 PARKING_CAPACITY = 1_000_000
 
-# Toggle the real-world background traffic process (reads flow_2_3_avg.csv).
+# Whether to layer real-world background traffic on top of the simulated cars.
 ENABLE_BACKGROUND_DENSITY = True
 
 
 def load_graph():
-    """Load the prepared OSMnx road graph (network.pkl)."""
+    """Load and return the prepared OSMnx road graph from network.pkl."""
     with open(NETWORK_PKL, 'rb') as f:
         return pickle.load(f)
 
@@ -54,20 +57,21 @@ def load_graph():
 def prepare_start_nodes(G, density_map):
     """Validate and clean the car entry-node data before the run.
 
-    Init-time guards for known data issues (see TASKLIST: "Fix nodes"):
+    Two known data issues are guarded against here:
       - Drop any start node that cannot reach the parking lot in the directed
-        graph (otherwise its cars crash on shortest_path).
-      - Validate/normalise the remaining entry probabilities so np.random.choice
-        always receives a valid distribution.
+        graph, since a car starting there would crash on shortest_path.
+      - Renormalise the remaining entry probabilities so np.random.choice always
+        receives a valid distribution that sums to 1.
 
-    Mutates config.ROAD_NETWORK in place so TVisitor / TCarGenerator pick up the
-    cleaned values, and returns the cleaned {name: node_id} dict.
+    The cleaned values are written back into config.ROAD_NETWORK so the visitor
+    and car generators pick them up, and the cleaned {name: node_id} dict is
+    returned for convenience.
     """
     start_nodes = dict(config.ROAD_NETWORK['StartNodes'])
     probs = dict(config.ROAD_NETWORK['CarStartNodeProb'])
     parking = config.ROAD_NETWORK['Parkinglot']
 
-    # 1. reachability filter
+    # Step 1: keep only the start nodes that can actually reach the parking lot.
     reachable = {}
     for name, nid in start_nodes.items():
         try:
@@ -77,7 +81,7 @@ def prepare_start_nodes(G, density_map):
             print(f"  [WARN] start node {name} ({nid}) has no path to the parking "
                   f"lot - dropping it (data issue: fix node).")
 
-    # 2. normalise probabilities over the reachable nodes
+    # Step 2: renormalise the probabilities over the surviving nodes.
     weights = {name: probs.get(name, 0.0) for name in reachable}
     total = sum(weights.values())
     if total <= 0:
@@ -93,7 +97,12 @@ def prepare_start_nodes(G, density_map):
 
 
 def queue_snapshot_update(env, logger, busqueue, ticketqueue, carqueues, parking_entry, parking_lot):
-    """Periodically sample queue lengths for replay/dashboard time sliders."""
+    """SimPy process: periodically record the length of every queue.
+
+    Snapshots are taken at a fixed interval so the dashboard and replay can
+    reconstruct queue lengths over time, independent of the enqueue/dequeue
+    events logged by the components themselves.
+    """
     interval = config.LOGGING['QueueSampleInterval']
     while True:
         logger.log_queue(
@@ -114,6 +123,7 @@ def queue_snapshot_update(env, logger, busqueue, ticketqueue, carqueues, parking
             actor_type='system',
             actor_id='',
         )
+        # One snapshot row per car pickup queue (there is one per entry node).
         for node_id, queue in carqueues.items():
             logger.log_queue(
                 sim_time=env.now,
@@ -146,7 +156,11 @@ def queue_snapshot_update(env, logger, busqueue, ticketqueue, carqueues, parking
 
 
 def segment_snapshot_update(env, G, density_map, logger):
-    """Periodically sample every road segment for map/replay reconstruction."""
+    """SimPy process: periodically record the density state of every road edge.
+
+    These snapshots drive the congestion colouring on the map replay and the
+    hotspot chart on the dashboard.
+    """
     interval = config.LOGGING['SegmentSampleInterval']
     while True:
         for u, v, _data in G.edges(data=True):
@@ -164,6 +178,7 @@ def segment_snapshot_update(env, G, density_map, logger):
 
 
 def main():
+    # The clock starts at the event start time rather than 0.
     env = simpy.Environment(initial_time=config.SIMULATION['EventStartTime'])
     logger = SimulationLogger(
         config.LOGGING['OutputDir'],
@@ -190,6 +205,7 @@ def main():
     if ENABLE_BACKGROUND_DENSITY:
         env.process(background_density_update(env, G, density_map))
 
+    # Snapshot processes only run when their sampling interval is enabled.
     if config.LOGGING['QueueSampleInterval'] > 0:
         env.process(queue_snapshot_update(
             env,
@@ -203,16 +219,16 @@ def main():
     if config.LOGGING['SegmentSampleInterval'] > 0:
         env.process(segment_snapshot_update(env, G, density_map, logger))
 
-    # --- components (PDL Initialization order) ---
+    # --- components: each starts its own SimPy processes on construction ---
     ticket_scan = TTicketScan(env, ticketqueue, logger)
     shuttle_bus = TShuttleBus(env, G, density_map, busqueue, logger)
     car_generator = TCarGenerator(env, G, density_map, parking_lot, parking_entry, carqueues, logger)
     visitor_generator = TVisitorGenerator(env, busqueue, carqueues, ticketqueue, logger)
 
-    # --- run ---
+    # --- run the simulation until the event end time ---
     env.run(until=config.SIMULATION['EventEndingTime'])
 
-    # --- summary (per-visitor logging is Phase 5) ---
+    # --- assemble and log the scenario summary, then flush all logs ---
     waiting_for_car = sum(len(q.items) for q in carqueues.values())
     logger.set_final_time(env.now)
     scenario_summary = {
@@ -231,10 +247,12 @@ def main():
         'ticket_scan_lanes': config.TICKET_SCAN['NumScanLanes'],
         'parking_entry_lanes': config.CAR['ParkingLotEntryLanes'],
     }
+    # Merge in the computed KPIs (travel times, CO2, peak queues, etc.).
     scenario_summary.update(logger.summary_metrics(config.EMISSIONS))
     logger.log_scenario_summary(scenario_summary)
     logger.flush(final_time=env.now)
 
+    # --- console summary of the finished run ---
     print(f"\nSimulation finished at t = {env.now} s")
     print(f"Run ID:                      {logger.run_id}")
     print(f"Logs written to:             {config.LOGGING['OutputDir']}")
