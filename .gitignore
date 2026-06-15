@@ -5,3 +5,24 @@ __pycache__/
 *.csv
 *.jsonl
 *.html
+modal_split_outputs/heatmap_public_transport_share_freq_6_per_hour.png
+modal_split_outputs/heatmap_public_transport_share_freq_5_per_hour.png
+modal_split_outputs/heatmap_public_transport_share_freq_4_per_hour.png
+modal_split_outputs/heatmap_public_transport_share_freq_3_per_hour.png
+modal_split_outputs/heatmap_co2_per_visitor_freq_6_per_hour.png
+modal_split_outputs/heatmap_co2_per_visitor_freq_5_per_hour.png
+modal_split_outputs/heatmap_co2_per_visitor_freq_4_per_hour.png
+modal_split_outputs/heatmap_co2_per_visitor_freq_3_per_hour.png
+modal_split_outputs/heatmap_break_even_fee_freq_6_per_hour.png
+modal_split_outputs/heatmap_break_even_fee_freq_5_per_hour.png
+modal_split_outputs/heatmap_break_even_fee_freq_4_per_hour.png
+modal_split_outputs/heatmap_break_even_fee_freq_3_per_hour.png
+modal_split_model_with_heatmap.py
+OUTPUT Data Files/logs/arrival_funnel_log.csv
+OUTPUT Data Files/logs/bus_log.csv
+OUTPUT Data Files/logs/car_log.csv
+OUTPUT Data Files/logs/queue_log.csv
+OUTPUT Data Files/logs/scenario_summary.jsonl
+OUTPUT Data Files/logs/segment_density_log.csv
+OUTPUT Data Files/logs/visitor_log.csv
+OUTPUT Data Files/scenarios.zip
