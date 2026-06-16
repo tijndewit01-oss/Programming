@@ -36,6 +36,9 @@ Car_Spacing = config.TRAFFIC_MODEL['Car_Spacing']
 for u, v, data in G.edges(data=True):
     length = data.get('length', 0.0)
     # Two-way edges share their lane count between directions, so halve it.
+    # Default True (one-way) when the OSM tag is absent: a deliberate
+    # conservative assumption that avoids double-counting lane capacity on
+    # untagged edges.
     if not data.get('oneway', True):
         lanes_raw = data.get('lanes', 2)/2
     else:
@@ -43,7 +46,8 @@ for u, v, data in G.edges(data=True):
     try:
         # maxspeed may be e.g. "50" or "50 mph"; take the leading number.
         u_max = float(str(data.get('maxspeed', config.TRAFFIC_MODEL['speed_fallback'])).split()[0])
-    except:
+    except (ValueError, TypeError):
+        # Catch parse failures on the maxspeed tag (e.g. non-numeric strings).
         u_max = config.TRAFFIC_MODEL['speed_fallback']  # Fall back to the default speed on any parse failure.
     u_max_ms = u_max / 3.6  # Convert kph to m/s.
     data['u_max_ms'] = u_max_ms

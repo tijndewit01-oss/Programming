@@ -60,6 +60,9 @@ class TShuttleBus:
                 break  # Deadline reached: depart even if not full.
             # Race a queued arrival against the timeout to see which fired.
             get = self.busqueue.get()
+            # `|` is the SimPy AnyOf operator: this yields until either the
+            # queue get fires or the timeout fires. `result` is a dict keyed by
+            # whichever event(s) triggered.
             result = yield get | self.env.timeout(remaining)
             if get in result:
                 result[get].set_state('in_bus', 'bus')
@@ -76,6 +79,8 @@ class TShuttleBus:
         trip_id = 0
         while True:
             # --- boarding phase at the station ---
+            # `yield from` is required because _board is itself a SimPy
+            # generator; a plain call would not yield control to the event loop.
             passengers = yield from self._board()
 
             # Skip empty trips: a bus with no passengers keeps waiting at the

@@ -89,6 +89,8 @@ class SimulationLogger:
     def _make_run_id(self):
         """Build a unique run_id from the current timestamp plus a random suffix."""
         stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # uuid4() produces a random UUID; hex[:8] takes the first 8 hex
+        # characters as a short uniqueness suffix.
         return f"{stamp}_{uuid.uuid4().hex[:8]}"
 
     def next_id(self, entity_name):
@@ -248,6 +250,9 @@ class SimulationLogger:
             self._migrate_csv_schema(path, fieldnames)
             should_write_header = not os.path.exists(path) or os.path.getsize(path) == 0
             with open(path, 'a', newline='') as f:
+                # extrasaction='ignore' tells DictWriter to silently drop any
+                # dict keys not listed in fieldnames, so rows with extra fields
+                # do not raise an error.
                 writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
                 if should_write_header:
                     writer.writeheader()

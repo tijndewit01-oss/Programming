@@ -21,6 +21,7 @@ from typing import Tuple, Dict, Any
 
 
 # Type aliases used throughout the road-network code for readability.
+# Defined here and imported by other modules (e.g. the network/traffic code).
 NodeID = int
 Distance = float
 RoadEdge = Tuple[NodeID, NodeID, Distance]
@@ -91,7 +92,7 @@ CAR: Dict[str, Any] = {
 	'FindSpaceParkCar': 60,
 	# Number of parallel parking-entry lanes and the service time per car at one.
 	'ParkingLotEntryLanes': 2,
-	'ParkingLotEntryDelay': lambda: 7.0,
+	'ParkingLotEntryDelay': 7.0,
 	# Maximum time (s) a car will wait for passengers before giving up.
 	'MaxWaitTime': 120,
 	# Car occupancy is drawn uniformly from low..high passengers inclusive.
@@ -131,6 +132,8 @@ VISITOR_GENERATOR: Dict[str, Any] = {
 	# Distribution of absolute departure times, fitted to scanner arrival data.
 	# The 'shift' is the gamma location minus the mean travel time, so departures
 	# are timed to produce the observed arrivals at the festival.
+	# 45*60 subtracts an assumed 45-minute travel time to back-calculate
+	# departure times from the observed scanner arrival times.
 	'InterDepartDistributionParams': {'dist': 'gamma', 'kappa' : 1.4593, 'theta': 4606.5, 'shift': 66271.6 - 45*60},
 	# Share of visitors choosing each transport mode (must sum to 1).
 	'ModeSplit': {'car': 0.73, 'shuttle': 0.27},

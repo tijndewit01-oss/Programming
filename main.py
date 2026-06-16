@@ -152,6 +152,9 @@ def queue_snapshot_update(env, logger, busqueue, ticketqueue, carqueues, parking
             actor_type='system',
             actor_id='',
         )
+        # The wait comes after the logging, so the first snapshot is captured
+        # immediately at simulation start (t=EventStartTime) and then every
+        # `interval` seconds thereafter.
         yield env.timeout(interval)
 
 
@@ -174,6 +177,9 @@ def segment_snapshot_update(env, G, density_map, logger):
                 segment_id=f"{u}->{v}",
                 **edge_state(u, v, density_map),
             )
+        # The wait comes after the logging, so the first snapshot is captured
+        # immediately at simulation start (t=EventStartTime) and then every
+        # `interval` seconds thereafter.
         yield env.timeout(interval)
 
 

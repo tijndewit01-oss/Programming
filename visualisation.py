@@ -30,6 +30,7 @@ REPLAY_OUTPUT_PATH = os.path.join('OUTPUT Data Files', 'simulation_replay.html')
 
 FRAME_STEP_SECONDS = 20
 
+# Alternative 4-bucket colour scheme (simpler; kept for reference)
 # ROAD_BUCKETS = [
 #     ('free', 'Free', 0.25, '#2ca25f', 3.0),
 #     ('busy', 'Busy', 0.50, '#fdd835', 4.0),
@@ -427,6 +428,8 @@ def build_queue_series(queue_log: pd.DataFrame, frame_times: list[float]) -> dic
         aggfunc='last',
     ).sort_index()
     frame_index = pd.Index(frame_times, name='sim_time')
+    # .ffill() forward-fills: it propagates the last known queue length to frame
+    # times that fall between snapshots.
     pivot = pivot.reindex(pivot.index.union(frame_index)).sort_index().ffill().reindex(frame_index).fillna(0)
 
     car_queue_columns = [column for column in pivot.columns if str(column).startswith('car_queue_')]
@@ -929,6 +932,9 @@ def build_frames(
             go.Frame(
                 name=str(int(frame_time)),
                 data=frame_data,
+                # trace 0 = static grey network (never updated);
+                #  traces 1..N = one per road bucket; N+1 = bus scatter;
+                #  N+2 = queue bar; N+3 = visitor-state bar
                 traces=list(range(1, len(ROAD_BUCKETS) + 4)),
                 layout={'title': {'text': replay_title(run_id, summary, frame_time)}},
             )
@@ -1081,6 +1087,8 @@ def road_payload_at(
     if not road_snapshot_times:
         return [{'x': [], 'y': [], 'hovertext': []} for _ in ROAD_BUCKETS], None
 
+    # Binary search returning the insertion index, so index - 1 is the most
+    # recent snapshot at or before frame_time.
     index = bisect.bisect_right(road_snapshot_times, frame_time) - 1
     if index < 0:
         index = 0

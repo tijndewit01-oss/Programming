@@ -31,6 +31,7 @@ visitor_log = LogDir / 'visitor_log.csv'
 queue_log = LogDir / 'queue_log.csv'
 
 # Every parameter combination to simulate, plus the two scenarios worth a replay.
+# product() yields the Cartesian product — every combination of the three parameter lists.
 scenarios = list(product(TRAIN_DISCOUNTS, SHUTTLE_FREQS_PER_HOUR, PARKING_FEE_FRACTIONS_OF_TICKET))
 sim_baseline = (0, 3, 0)
 sim_max = (1.00, 6, 0.50)
@@ -56,7 +57,7 @@ METRIC_LABELS = {
 }
 
 # Number of repetitions per scenario, averaged to smooth out randomness.
-n_runs = 10
+n_runs = 20
 
 
 def make_run_id(
@@ -72,7 +73,7 @@ def make_run_id(
 def get_run_average():
     """Run every scenario n_runs times, then aggregate and visualise the results."""
     clear_logs()
-    for t, s , p in tqdm(scenarios, desc="Running scenarios", position=0):
+    for t, s , p in tqdm(scenarios, desc="Running scenarios", position=0):  # t = train_discount, s = shuttle_freq, p = parking_fee
         # Turn this scenario's policy levers into the mode split the sim uses.
         s_pt, s_car = modal_split(t, s, p)
         config.VISITOR_GENERATOR['ModeSplit'] = {'car': s_car, 'shuttle': s_pt}
@@ -89,6 +90,8 @@ def get_run_average():
             run_id = make_run_id(t, s, p, i)
             config.LOGGING['RunId'] = run_id
             # Silence main()'s console summary during the sweep.
+            # StringIO() is an in-memory buffer; redirecting stdout here discards
+            # all print output from main() during the sweep.
             with contextlib.redirect_stdout(io.StringIO()):
                 main()
             # Build a map replay from the first repetition of the two key scenarios.
@@ -116,7 +119,8 @@ def clear_logs():
 
 
 def runid_type(run_id_value):
-    """Strip the repetition suffix so all reps of a scenario share one key."""
+    """Strip the repetition suffix (e.g. 'rep_3') from a run_id so that all
+    repetitions of the same scenario share one grouping key."""
     return run_id_value.rsplit("rep_", 1)[0]
 
 def average_visitor_log(visitor_data):

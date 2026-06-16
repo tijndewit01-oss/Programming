@@ -91,6 +91,8 @@ class TVisitor:
             self.busqueue.put(self)   # Join the shuttle queue.
             self._log_queue('shuttle_bus_queue', 'bus_stop', len(self.busqueue.items), 'enqueue')
             yield self._wake          # Passivate until the bus reactivates us.
+            # A SimPy event is one-shot: once triggered it can never fire again,
+            # so create a fresh event before the visitor can passivate again.
             self._wake = self.env.event()
         else:
             # Car: join the carpool queue and wait until the car has parked.
@@ -103,6 +105,8 @@ class TVisitor:
                 'enqueue',
             )
             yield self._wake          # Passivate until the car reactivates us.
+            # A SimPy event is one-shot: once triggered it can never fire again,
+            # so create a fresh event before the visitor can passivate again.
             self._wake = self.env.event()
 
         # --- both modes merge here: walk to the ticket scan and get scanned ---

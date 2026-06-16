@@ -68,6 +68,9 @@ class TCar:
 
             # Race a queued arrival against the timeout to know which fired.
             get = self.carqueues[self.source].get()
+            # `|` is the SimPy AnyOf operator: this yields until either the
+            # queue get fires or the timeout fires. `result` is a dict keyed by
+            # whichever event(s) triggered.
             result = yield get | self.env.timeout(remaining)
             if get in result:
                 self.passengers.append(result[get])
@@ -80,6 +83,8 @@ class TCar:
 
     def run(self):
         """Drive the full car lifecycle: board, route, queue, park, release."""
+        # `yield from` is required because board_visitors is itself a SimPy
+        # generator; a plain call would not yield control to the event loop.
         yield from self.board_visitors()
         self.departed_event.succeed()
         # An empty car (timed out with no passengers) does not drive anywhere.

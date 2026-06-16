@@ -46,6 +46,7 @@ x_bars_second = (x_bars / 2 + 12) * 3600  # e.g. slot 1 -> 12:30 -> 45000 s.
 # arrivals at 18:00 (64800 s); bounds keep the fit physically sensible.
 p0 = [2.0, 64800.0, 3600.0]
 bounds = ([0.1, 0.0, 1.0], [50.0, 86400.0, 86400.0])
+# _ is the covariance matrix (pcov); discarded here as only point estimates are needed.
 opt_params, _ = curve_fit(
     gamma_pdf_scaled, x_bars_second, normalize_data(day1),
     p0=p0, bounds=bounds, maxfev=20000

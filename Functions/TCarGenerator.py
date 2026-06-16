@@ -35,6 +35,9 @@ class TCarGenerator:
         # matches both the carqueue keys and the road-graph nodes.
         for node in self.start_nodes.values():
             self.env.process(self.manage_node(node))
+        # Yield control to the SimPy event loop for one tick so the freshly
+        # spawned manage_node processes can start running before this generator
+        # returns. Without it the node processes never begin.
         yield self.env.timeout(0)
 
     def manage_node(self, node):

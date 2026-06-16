@@ -57,6 +57,8 @@ class TrafficDensityMap:
         self._rho_max[key] = rho_max
         self._u_max_ms[key] = u_max_ms
         self._length[key] = length
+        # setdefault only writes the value if the key is absent, so any density
+        # already on this edge is preserved if the edge is re-initialised.
         self._density.setdefault(key, 0.0)  # Keep any density already recorded for this edge.
         self._rho_background[key] = 0.0
 
@@ -241,6 +243,9 @@ def background_density_update(env, G, density_map):
         length_km = data.get('length', 0.0) / 1000.0
         if u_max_ms <= 0 or length_km <= 0:
             return flow * 0.0
+        # density [veh/km] = flow [veh/h] / speed [km/h]; multiply by length [km]
+        # to get the vehicle count on the edge. The factor 3.6 converts u_max_ms
+        # from m/s to km/h.
         return (flow / (u_max_ms * 3.6)) * length_km
 
     def clamp_hour(h):
@@ -311,6 +316,8 @@ def background_density_update(env, G, density_map):
         # Walk through the window in 60 s steps, updating every edge each step.
         window_end = target_boundary + interpolate / 2
         while env.now < window_end:
+            # t goes from 0 at the start of the ramp window to `interpolate` at
+            # the end, making frac = t / interpolate a 0->1 blend fraction.
             t = interpolate / 2 + (env.now - target_boundary)  # Elapsed time within the window [s].
             frac = t / interpolate
             for u, v, data in G.edges(data=True):

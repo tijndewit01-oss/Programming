@@ -19,6 +19,9 @@ G = ox.graph_from_xml("INPUT_Data_Files/network.osm")
 
 
 # Nearest node to each key (lon, lat) location.
+# ox.nearest_nodes takes (longitude, latitude) — note lon before lat.
+# These individual variables feed the plot highlight set below; the dict further
+# down is the final mapping printed for config.py.
 Node1 = ox.nearest_nodes(G, 6.258743, 52.363001)
 Node2 = ox.nearest_nodes(G, 6.265216, 52.361613)
 Node3 = ox.nearest_nodes(G, 6.257414, 52.408386)
