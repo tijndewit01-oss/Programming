@@ -73,17 +73,19 @@ def get_run_average():
     """Run every scenario n_runs times, then aggregate and visualise the results."""
     clear_logs()
     for t, s , p in tqdm(scenarios, desc="Running scenarios", position=0):
-        # Only log road-segment density for the two scenarios that get a replay;
-        # disabling it elsewhere keeps the sweep fast and the logs small.
-        if (t, s, p) == sim_baseline or (t, s, p) == sim_max:
-            config.LOGGING['SegmentSampleInterval'] = 300
-        else:
-            config.LOGGING['SegmentSampleInterval'] = 0
-
         # Turn this scenario's policy levers into the mode split the sim uses.
         s_pt, s_car = modal_split(t, s, p)
         config.VISITOR_GENERATOR['ModeSplit'] = {'car': s_car, 'shuttle': s_pt}
+        # Update to this scenario's bus frequency. 
+        config.SHUTTLE_BUS['n_buses'] = s
         for i in tqdm(range(n_runs), desc="Reps", position=1, leave=False):
+            # Only log road-segment density for the two scenarios that get a replay;
+            # disabling it elsewhere keeps the sweep fast and the logs small.
+            if i == 0 and ((t, s, p) == sim_baseline  or (t, s, p) == sim_max ):
+                config.LOGGING['SegmentSampleInterval'] = 300
+            else:
+                config.LOGGING['SegmentSampleInterval'] = 0
+
             run_id = make_run_id(t, s, p, i)
             config.LOGGING['RunId'] = run_id
             # Silence main()'s console summary during the sweep.

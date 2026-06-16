@@ -28,13 +28,26 @@ LOG_DIR = config.LOGGING['OutputDir']
 NETWORK_PATH = os.path.join('INPUT_Data_Files', 'network.pkl')
 REPLAY_OUTPUT_PATH = os.path.join('OUTPUT Data Files', 'simulation_replay.html')
 
-FRAME_STEP_SECONDS = 15
+FRAME_STEP_SECONDS = 20
+
+# ROAD_BUCKETS = [
+#     ('free', 'Free', 0.25, '#2ca25f', 3.0),
+#     ('busy', 'Busy', 0.50, '#fdd835', 4.0),
+#     ('congested', 'Congested', 0.75, '#fb8c00', 5.5),
+#     ('jammed', 'Very congested', math.inf, '#d73027', 8.0),
+# ]
 
 ROAD_BUCKETS = [
-    ('free', 'Free', 0.25, '#2ca25f', 3.0),
-    ('busy', 'Busy', 0.50, '#fdd835', 4.0),
-    ('congested', 'Congested', 0.75, '#fb8c00', 5.5),
-    ('jammed', 'Very congested', math.inf, '#d73027', 8.0),
+    ('0_10',  '0–10%',    0.10, '#1e3a8a', 3.5),   # dark blue
+    ('10_20', '10–20%',   0.20, '#2563eb', 4.0),   # blue
+    ('20_30', '20–30%',   0.30, '#60a5fa', 4.5),   # light blue
+    ('30_40', '30–40%',   0.40, '#06b6d4', 5.0),   # cyan
+    ('40_50', '40–50%',   0.50, '#16a34a', 5.5),   # green
+    ('50_60', '50–60%',   0.60, '#86efac', 6.0),   # light green
+    ('60_70', '60–70%',   0.70, '#fdd835', 6.5),   # yellow
+    ('70_80', '70–80%',   0.80, '#f97316', 7.5),   # orange
+    ('80_90', '80–90%',   0.90, '#ef4444', 8.5),   # red
+    ('90+',   '90%+',   math.inf, '#991b1b', 9.0), # dark red
 ]
 
 QUEUE_ORDER = [
@@ -916,7 +929,7 @@ def build_frames(
             go.Frame(
                 name=str(int(frame_time)),
                 data=frame_data,
-                traces=[1, 2, 3, 4, 5, 6, 7],
+                traces=list(range(1, len(ROAD_BUCKETS) + 4)),
                 layout={'title': {'text': replay_title(run_id, summary, frame_time)}},
             )
         )

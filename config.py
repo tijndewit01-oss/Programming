@@ -27,7 +27,7 @@ RoadEdge = Tuple[NodeID, NodeID, Distance]
 
 SIMULATION: Dict[str, Any] = {
 	# Total number of visitors generated over the event.
-	'NumberVisitors': 10000, #5100,
+	'NumberVisitors': 10000,
 	# Simulation clock runs in seconds since midnight; these mark the event window.
     'EventStartTime': 63000, # 17:30 expressed in seconds since midnight.
 	'EventEndingTime': 86400, # 24:00 (end of Saturday) in seconds.
@@ -58,11 +58,11 @@ ROAD_NETWORK: Dict[str, Any] = {
     'StartNodes':  {'Node1': 46354890, 'Node2': 46336597, 'Node3': 46527746, 'Node4': 46493064, 'Node5': 3611512307},
     # Probability that an arriving car uses each entry node (must sum to 1).
     'CarStartNodeProb': {
-        'Node1': 0.4854844416,
-        'Node2': 0.009832219139,
-        'Node3': 0.02623787267,
-        'Node4': 0.0528667995,
-        'Node5': 0.4214074226,
+        'Node1': 0.4857,
+        'Node2': 0.0108,
+        'Node3': 0.0272,
+        'Node4': 0.0539,
+        'Node5': 0.4224,
     },
     # OSM node IDs of the shuttle stop and the parking lot.
     'Bus_start': 46477307,
@@ -92,8 +92,8 @@ CAR: Dict[str, Any] = {
 	# Number of parallel parking-entry lanes and the service time per car at one.
 	'ParkingLotEntryLanes': 2,
 	'ParkingLotEntryDelay': lambda: 7.0,
-	# Maximum time (s) a car will wait for passengers before giving up. PLACEHOLDER.
-	'MaxWaitTime': 180,
+	# Maximum time (s) a car will wait for passengers before giving up.
+	'MaxWaitTime': 120,
 	# Car occupancy is drawn uniformly from low..high passengers inclusive.
 	'CarCapacityDistribution': {'dist': 'equal', 'low': 1, 'high': 4},
 }
@@ -116,7 +116,7 @@ TICKET_SCAN: Dict[str, Any] = {
 	# Time (s) to process one visitor: ticket scan plus a bag search.
 	'ScanTimePerTicket': 3 + 10,
 	# Number of parallel ticket-scan lanes.
-	'NumScanLanes': 8,
+	'NumScanLanes': 12,
 }
 
 VISITOR: Dict[str, Any] = {
